@@ -22,14 +22,14 @@ printf "********************************************************** \n"
 
 ####Command to execute Python program
 config=0
-# python -u create_config.py -dataset MNIST -j 16 --base_channels 64 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py -dataset MNIST --lossfuncB SSIM  -j 16 --base_channels 64 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
 if [ $config == 0 ]
     then
-    runname='Jan17-08-53_fc540af17a_325'  #'Jan15-11-58_fc540af17a_346'  #'Jan15-11-38_fc540af17a_617'  #'Jan15-11-58_fc540af17a_346'  #   #'Dec30-16-38_04f1282767_1'   #'Dec29-10-13_fd73bdce0b_2'  #Dec06-23-07_81c6b0578b_2' #'Dec06-12-23_81c6b0578b_2'   #'Dec06-09-41_81c6b0578b_2' #'Dec06-12-09_81c6b0578b_2'
+    runname='Jan17-10-51_fc540af17a_278'  #'Jan15-11-58_fc540af17a_346'  #'Jan15-11-38_fc540af17a_617'  #'Jan15-11-58_fc540af17a_346'  #   #'Dec30-16-38_04f1282767_1'   #'Dec29-10-13_fd73bdce0b_2'  #Dec06-23-07_81c6b0578b_2' #'Dec06-12-23_81c6b0578b_2'   #'Dec06-09-41_81c6b0578b_2' #'Dec06-12-09_81c6b0578b_2'
     configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
 
-    # python -u main_train.py --method BSL  --config-file $configpath
+    # python -u main_train_wBlockedSL.py --method BSL  --config-file $configpath
     # python -u main_train.py --method SLVanilla  --config-file $configpath
     # python -u main_train.py --method FA  --config-file $configpath
     # python -u main_train.py --method BP  --config-file $configpath
@@ -64,7 +64,7 @@ if [ $config == 0 ]
     # done
     # done
     
-    # python -u generate_figures.py --eval_robust True --eval_time 2020-01-16_22-22 --config-file $configpath
+    python -u generate_figures.py --eval_robust True --eval_time 2020-01-17_13-31 --config-file $configpath
     
     fi
 #------------ history

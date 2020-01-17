@@ -53,3 +53,29 @@ def find(pattern, path):
     return result
 
 # find('*.txt', '/path/to/dir')
+
+import numpy as np
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pylab as plt
+
+def generate_sample_images(images, target, title, param_dict, args):
+
+    fig, axes = plt.subplots(nrows=1, ncols=5, figsize=[6,2])
+    for im in range(5):
+        implot = images[im].cpu().numpy()
+        # if the image has three channels like in CIFAR
+        if images.shape[1] == 3:
+        
+            implot = np.swapaxes(implot,0,2)        
+            implot = (implot - np.min(implot))/np.ptp(implot)                
+        else:
+            implot = implot.squeeze()
+        axes[im].imshow(implot)
+        axes[im].axis('off')
+        axes[im].set_title('C=%s'%target[im].item())
+    fig.suptitle(args.runname + ', %s: %s'%(title, param_dict), fontsize=8)
+    fig.savefig(args.resultsdir+'%s_samples_eval%s_%s_%s.png'%(title, args.eval_time, args.method, param_dict), dpi=200)
+    fig.savefig(args.resultsdir+'%s_samples_eval%s_%s_%s.pdf'%(title, args.eval_time, args.method, param_dict), dpi=200)
+    print('%s_samples_eval%s_%s_%s.png saved at %s'%(title, args.eval_time, args.method, param_dict, args.resultsdir))
+    plt.clf()

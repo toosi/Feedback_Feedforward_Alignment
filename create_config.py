@@ -125,6 +125,8 @@ parser.add_argument('--optimizerF', default='RMSprop', type=str,
                     help='optimizer for encoder')
 parser.add_argument('--optimizerB', default='RMSprop', type=str,
                     help='optimizer for decoder')
+parser.add_argument('--lossfuncB', default='MSELoss', type=str,
+                    help='MSELoss|SSIM')
 parser.add_argument('-p', '--print-freq', default=200, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',

@@ -603,11 +603,6 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                 gener = targetproj
                 reference = inputs_avgcat
             
-            reference = F.interpolate(reference, size=gener.shape[-1])
-
-            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
-
-
             for _ in range(itr):
                 # compute output
                 latents, output = modelF(gener.detach())
@@ -795,7 +790,7 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
 
         # ----- decoder ------------------ 
 
-        latents,  _ = modelF(images)
+        latents,  _ = modelF(perturbed_images)
         recons = modelB(latents.detach())
         
         if args.method == 'SLTemplateGenerator':
@@ -856,10 +851,6 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
         reference = F.interpolate(reference, size=gener.shape[-1])
 
         lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
-
-
-        # lossd = criteriond(recons, images) #+ criterione(modelF(pooled), target)
-
         # measure correlation and record loss
         pcorr = correlation(gener, reference)
         losses.update(lossd.item(), images.size(0))
@@ -869,15 +860,9 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
             # compute output
             latents, output = modelF(gener.detach())
 
-            losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
-
-            # measure accuracy and record loss
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            top1.update(acc1[0].item(), images.size(0))
-
             # ----- decoder ------------------ 
 
-            latents,  _ = modelF(recons.detach())
+            recons = modelB(latents.detach())
             if args.method == 'SLTemplateGenerator':
                 repb = onehot.detach()#modelB(onehot.detach())
                 
@@ -931,6 +916,14 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
                 gener = targetproj
                 reference = inputs_avgcat
             
+
+            losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
+
+            # measure accuracy and record loss
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            top1.update(acc1[0].item(), images.size(0))
+
+
             reference = F.interpolate(reference, size=gener.shape[-1])
 
             lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
