@@ -534,6 +534,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
         print('*****  lrF=%1e'%(lrF))
+        
         # train for one epoch
         modelF, modelB, train_results = train(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB, schedulerF,schedulerB, epoch, args)
         Train_acce_list.extend( [round(train_results[0],3)])
@@ -564,7 +565,8 @@ def main_worker(gpu, ngpus_per_node, args):
         is_beste = acce > best_acce
         best_acce = max(acce, best_acce)
     
-        
+        if args.method == 'BSL':
+            break
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
@@ -591,6 +593,83 @@ def main_worker(gpu, ngpus_per_node, args):
                 
                 json.dump(run_json_dict, fp, indent=4, sort_keys=True)        
                 fp.write("\n")
+
+    if args.method == 'BSL':
+
+        modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))
+
+        for epoch in range(args.start_epoch, args.epochs):
+
+            if args.distributed:
+            
+                train_sampler.set_epoch(epoch)
+
+        
+            for param_group in optimizerF.param_groups:
+                lrF = param_group['lr'] 
+            lrF_list.extend([lrF])
+            run_json_dict.update({'lrF':lrF_list})
+
+
+            print('*****  lrF=%1e'%(lrF))
+            
+            # train for one epoch
+            modelF, modelB, train_results = train(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB, schedulerF,schedulerB, epoch, args)
+            Train_acce_list.extend( [round(train_results[0],3)])
+            Train_corrd_list.extend([round(train_results[1],3)])
+            Train_lossd_list.extend([train_results[2]])
+            run_json_dict.update({'Train_acce':Train_acce_list})
+            run_json_dict.update({'Train_corrd':Train_corrd_list})
+            run_json_dict.update({'Train_lossd':Train_lossd_list})
+            # evaluate on validation set
+            _, _, test_results = validate(val_loader, modelF,modelB, criterione, criteriond, args, epoch)
+            
+            acce = test_results[0]
+            corrd = test_results[1]
+            Test_acce_list.extend( [round(test_results[0],3)])
+            Test_corrd_list.extend([round(test_results[1],3)])
+            Test_lossd_list.extend([test_results[2]])
+            run_json_dict.update({'Test_acce':Test_acce_list})
+            run_json_dict.update({'Test_corrd':Test_corrd_list})
+            run_json_dict.update({'Test_lossd':Test_lossd_list})
+
+            # ---- adjust learning rates ----------
+
+            adjust_learning_rate(schedulerF, acce)
+            adjust_learning_rate(schedulerB, corrd)#acce
+
+
+            # remember best acc@1 and save checkpoint
+            is_beste = acce > best_acce
+            best_acce = max(acce, best_acce)
+        
+            
+
+            if not args.multiprocessing_distributed or (args.multiprocessing_distributed
+                    and args.rank % ngpus_per_node == 0):
+
+                save_checkpoint({
+                    'epoch': epoch + 1,
+                    'arch': args.arche,
+                    'state_dict': modelF.state_dict(),
+                    'best_loss': best_acce,
+                    'optimizer' : optimizerF.state_dict(),
+                }, is_beste, filename='checkpointe_%s.pth.tar'%args.method)
+
+                if args.method.startswith('SL'):
+                    save_checkpoint({
+                        'epoch': epoch + 1,
+                        'arch': args.archd,
+                        'state_dict': modelB.state_dict(),
+                        'best_loss': best_acce,
+                        'optimizer' : optimizerB.state_dict(),
+                    }, is_beste,  filename='checkpointd_%s.pth.tar'%args.method)
+                
+                
+                with open('%s/%s_%s.json'%(args.databasedir,args.runname, args.method), 'w') as fp:
+                    
+                    json.dump(run_json_dict, fp, indent=4, sort_keys=True)        
+                    fp.write("\n")
 
 
 
@@ -658,8 +737,9 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         optimizerF.step()
         #schedulerF.step()
 
-        # modelB.load_state_dict(toggle_state_dict(modelF.state_dict(), modelB.state_dict()))
-        modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))#, modelB.state_dict()))
+        if args.method !='BSL':
+            # modelB.load_state_dict(toggle_state_dict(modelF.state_dict(), modelB.state_dict()))
+            modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))#, modelB.state_dict()))
 
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
@@ -781,6 +861,13 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
         len(val_loader),
         [batch_time, losses, m1, m2],
         prefix='Test %s: '%args.method)
+    
+    if args.gpu is not None:
+        
+        onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda(args.gpu, non_blocking=True)
+    else:
+        onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda()
+
 
     # switch to evaluate mode
     modelF.eval()
@@ -797,6 +884,9 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
             else:
                 images = images.cuda()
                 target = target.cuda()
+            
+            onehot.zero_()
+            onehot.scatter_(1, target.view(target.shape[0], 1), 1)
             
             if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
                 images= images.expand(-1, 1, -1, -1) #images.expand(-1, 3, -1, -1)
@@ -815,16 +905,68 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
             # ----- decoder ------------------ 
 
             latents,  _ = modelF(images)
-
             recons = modelB(latents.detach())
+            
+            if args.method == 'SLTemplateGenerator':
+                repb = onehot.detach()#modelB(onehot.detach())
+                
+                
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                        
+                        
+                targetproj = modelB(repb) #, switches
+
+                inputs_avgcat = torch.zeros_like(images)
+                for t in torch.unique(target):
+                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
+            
+                gener = targetproj
+                reference = inputs_avgcat
+
 
             
-            recons = F.interpolate(recons, size=images.shape[-1])
+            elif args.method == 'SLError':
+                #TODO: check the norm of subtracts
+                prob = nn.Softmax(dim=1)(output.detach())
+                repb = onehot - prob
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                gener = modelB(repb.detach())
+                reference = images - F.interpolate(recons, size=images.shape[-1])
 
-            lossd = criteriond(recons, images) #+ criterione(modelF(pooled), target)
+            elif args.method == 'SLRobust':
+                
+                prob = nn.Softmax(dim=1)(output.detach())
+                repb = onehot - prob
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                gener = modelB(repb.detach())
+                reference = images 
 
-            # measure correlation and record loss
-            pcorr = correlation(recons, images)
+            elif args.method == 'SLErrorTemplateGenerator':
+                prob = nn.Softmax(dim=1)(output.detach())
+                repb = onehot - prob#modelB(onehot.detach())
+                
+                
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                        
+                        
+                targetproj = modelB(repb) #, switches
+
+                inputs_avgcat = torch.zeros_like(images)
+                for t in torch.unique(target):
+                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
+            
+                gener = targetproj
+                reference = inputs_avgcat
+            
+            else: #args.method in ['SLVanilla','BP','FA']:
+                gener = recons
+                reference = images
+            
+            reference = F.interpolate(reference, size=gener.shape[-1])
+
+            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)       
+            
+            pcorr = correlation(gener, reference)
             losses.update(lossd.item(), images.size(0))
             corr.update(pcorr, images.size(0))
                 

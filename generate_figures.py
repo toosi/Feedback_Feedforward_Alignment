@@ -16,7 +16,7 @@ if socket.gethostname()[0:4] in  ['node','holm','wats']:
 elif socket.gethostname() == 'SYNPAI':
     path_prefix = '/hdd6gig/Documents/Research'
 elif socket.gethostname()[0:2] == 'ax':
-    path_prefix = '/scratch/issa/users/tt2684/Research'
+    path_prefix = '/home/tt2684/Research'
 
 parser = argparse.ArgumentParser(description='Generate figures')
 parser.add_argument(
@@ -40,19 +40,21 @@ if args.config_file:
 print(args.resultsdir.split('/Research')[1])
 
 if not(hasattr(args, 'databasedir')):
-    project = 'SYY2020'#'SYY_MNIST'
+    project = 'Symbio'#'SYY_MNIST'
     arch = 'E%sD%s'%(args.arche, args.archd)
     args.databasedir  = path_prefix+'/Results/database/%s/%s/%s/'%(project,arch,args.dataset)
 
 
-
+methods = ['BP', 'FA', 'SLVanilla','SLRobust', 'SLErrorTemplateGenerator']#, 'SLErrorTemplateGenerator' 'SLError', 
+colors =  {'BP':'k', 'FA':'grey', 'SLVanilla':'r','SLRobust':'salmon',
+            'SLError':'orange', 'SLErrorTemplateGenerator':'yellow'}
 
 if args.eval_robust:
     sigma2 = 0.0
     maxitr = 4
     Test_acce = {}
     epsilons = [0, 0.2, 0.4, 0.6, 0.8, 1]
-    for method in  ['BP', 'FA', 'SYYVanilla']:#,'SYYError','SYYTemplateGenerator'
+    for method in  methods:#,'SLError','SLTemplateGenerator'
         Test_acce_arr = np.zeros((4, 6))
         for ie , epsilon in enumerate(epsilons):
             # json_name = '%s_%s_eval%s_maxitr4_epsilon%0.1e.json'%(args.runname, method, args.eval_time, epsilon)
@@ -72,7 +74,7 @@ else:
     Test_corrd = {}
     Train_corrd = {}
 
-    for method in  ['BP', 'FA', 'SYYVanilla']:#,'SYYError','SYYTemplateGenerator'
+    for method in  methods:#,'SLError','SLTemplateGenerator'
         with open('%s%s_%s.json'%(args.databasedir,args.runname, method), 'r') as fp:
                         
             results = json.load(fp)        
@@ -87,7 +89,7 @@ else:
 
 
 
-args.resultsdir = args.resultsdir.replace('ConvMNIST_playground', 'SYY2020')
+# args.resultsdir = args.resultsdir.replace('ConvMNIST_playground', 'SYY2020')
 resultsdir = path_prefix + args.resultsdir.split('/Research')[1]
 pp.pprint(vars(args))
 # I used to save results into numpy files
@@ -112,17 +114,9 @@ if args.eval_robust:
     fig, axes = plt.subplots(nrows=1, ncols=4, figsize=[20,4])
 
     for itr in range(4):
-        axes[itr].plot(epsilons, Test_acce['SYYVanilla'][itr],color='r', label='SYY-Vanilla')
+        for method in methods:
 
-        axes[itr].plot(epsilons, Test_acce['BP'][itr],  color='k', label='BP')
-
-        axes[itr].plot(epsilons, Test_acce['FA'][itr], color='grey', label='FA')
-
-        # axes[0].plot(Train_acce['SYYTemplateGenerator'], ls='--',color='y')
-        # axes[0].plot(Test_acce['SYYTemplateGenerator'],color='y', label='SYY-TemplateGenerator')
-
-        # axes[0].plot(Train_acce['SYYError'], ls='--',color='orange')
-        # axes[0].plot(Test_acce['SYYError'],color='orange', label='SYY-Error')
+            axes[itr].plot(epsilons, Test_acce[method][itr], color=colors[method], label=method)
 
         axes[itr].set_xlabel('epsilon')
         axes[itr].set_ylabel('Discrimination accuracy: percent correct')
@@ -152,27 +146,15 @@ else:
     #------ accuracy ------------
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=[10,6])
 
-    axes[0].plot(Train_acce['SYYVanilla'], ls='--',color='r')
-    axes[0].plot(Test_acce['SYYVanilla'],color='r', label='SYY-Vanilla')
-    
-    axes[0].plot(Train_acce['BP'],ls='--',  color='k')
-    axes[0].plot(Test_acce['BP'],  color='k', label='BP')
+    for method in methods:
+            axes[0].plot(Train_acce[method], color=colors[method], ls='--')
 
-    axes[0].plot(Train_acce['FA'],ls='--', color='grey')
-    axes[0].plot(Test_acce['FA'], color='grey', label='FA')
-
-    print('TRAIN ACC','BP:',Train_acce['BP'][-1], 'SYYVanilla',Train_acce['SYYVanilla'][-1],'FA:',Train_acce['FA'][-1] )
-
-    print('TEST ACC','BP:',Test_acce['BP'][-1], 'SYYVanilla',Test_acce['SYYVanilla'][-1],'FA:',Test_acce['FA'][-1] )
-    # axes[0].plot(Train_acce['SYYTemplateGenerator'], ls='--',color='y')
-    # axes[0].plot(Test_acce['SYYTemplateGenerator'],color='y', label='SYY-TemplateGenerator')
-
-    # axes[0].plot(Train_acce['SYYError'], ls='--',color='orange')
-    # axes[0].plot(Test_acce['SYYError'],color='orange', label='SYY-Error')
+            axes[0].plot(Test_acce[method], color=colors[method], label=method)
 
 
-    # # axes[0].plot(results['SYYBP_Train'][:,1],  color='lightgrey', label='SYYBP %.2f'%results['SYYBP_Test'][0,1])
-    # axes[0].plot(results['SYYDecoderRobustOutput_Train'][:,1],  color='lightgrey', label='SYYDecoderRobustOutput %.2f'%results['SYYDecoderRobustOutput_Test'][0,1])
+
+    # # axes[0].plot(results['SLBP_Train'][:,1],  color='lightgrey', label='SLBP %.2f'%results['SLBP_Test'][0,1])
+    # axes[0].plot(results['SLDecoderRobustOutput_Train'][:,1],  color='lightgrey', label='SLDecoderRobustOutput %.2f'%results['SLDecoderRobustOutput_Test'][0,1])
 
     axes[0].set_xlabel('epoch')
     axes[0].set_ylabel('Discrimination accuracy: percent correct')
@@ -191,30 +173,21 @@ else:
 
     plt.clf()
 
+    print('************')
+    for method in methods:
+
+        print('Train ACC','%s:'%method, Train_acce[method][-1], end =" ")
+    print('************')
+    for method in methods:    
+        print('Test ACC','%s:'%method, Test_acce[method][-1], end =" ")
+    print('************')
     #------ reconstruction loss ------------
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=[10,6])
 
-    axes[0].plot(Train_lossd['SYYVanilla'], ls='--',color='r')
-    axes[0].plot(Test_lossd['SYYVanilla'],color='r', label='SYY-Vanilla')
-    
-    axes[0].plot(Train_lossd['BP'],ls='--',  color='k')
-    axes[0].plot(Test_lossd['BP'],  color='k', label='BP')
+    for method in methods:
+            axes[0].plot(Train_lossd[method], color=colors[method], ls='--')
 
-    axes[0].plot(Train_lossd['FA'],ls='--', color='grey')
-    axes[0].plot(Test_lossd['FA'], color='grey', label='FA')
-
-    print('TRAIN LOSSD','BP:',Train_lossd['BP'][-1], 'SYYVanilla',Train_lossd['SYYVanilla'][-1],'FA:',Train_lossd['FA'][-1] )
-
-    print('TEST LOSSD','BP:',Test_lossd['BP'][-1], 'SYYVanilla',Test_lossd['SYYVanilla'][-1],'FA:',Test_lossd['FA'][-1] )
-    # axes[0].plot(Train_acce['SYYTemplateGenerator'], ls='--',color='y')
-    # axes[0].plot(Test_acce['SYYTemplateGenerator'],color='y', label='SYY-TemplateGenerator')
-
-    # axes[0].plot(Train_acce['SYYError'], ls='--',color='orange')
-    # axes[0].plot(Test_acce['SYYError'],color='orange', label='SYY-Error')
-
-
-    # # axes[0].plot(results['SYYBP_Train'][:,1],  color='lightgrey', label='SYYBP %.2f'%results['SYYBP_Test'][0,1])
-    # axes[0].plot(results['SYYDecoderRobustOutput_Train'][:,1],  color='lightgrey', label='SYYDecoderRobustOutput %.2f'%results['SYYDecoderRobustOutput_Test'][0,1])
+            axes[0].plot(Test_lossd[method], color=colors[method], label=method)
 
     axes[0].set_xlabel('epoch')
     axes[0].set_ylabel('Reconstruction loss: perpixel')
@@ -233,31 +206,23 @@ else:
 
     plt.clf()
 
+    print('************')
+    for method in methods:
+
+        print('Train LossD','%s:'%method, Train_lossd[method][-1], end =" ")
+    print('************')
+    for method in methods:    
+        print('Test LossD','%s:'%method, Test_lossd[method][-1], end =" ")
+    print('************')
+
 
     #------ reconstruction corr ------------
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=[10,6])
 
-    axes[0].plot(Train_corrd['SYYVanilla'], ls='--',color='r')
-    axes[0].plot(Test_corrd['SYYVanilla'],color='r', label='SYY-Vanilla')
-    
-    axes[0].plot(Train_corrd['BP'],ls='--',  color='k')
-    axes[0].plot(Test_corrd['BP'],  color='k', label='BP')
+    for method in methods:
+            axes[0].plot(Train_corrd[method], color=colors[method], ls='--')
 
-    axes[0].plot(Train_corrd['FA'],ls='--', color='grey')
-    axes[0].plot(Test_corrd['FA'], color='grey', label='FA')
-
-    print('TRAIN CORR','BP:',Train_corrd['BP'][-1], 'SYYVanilla',Train_corrd['SYYVanilla'][-1],'FA:',Train_corrd['FA'][-1] )
-
-    print('TEST CORR','BP:',Test_corrd['BP'][-1], 'SYYVanilla',Test_corrd['SYYVanilla'][-1],'FA:',Test_corrd['FA'][-1] )
-    # axes[0].plot(Train_acce['SYYTemplateGenerator'], ls='--',color='y')
-    # axes[0].plot(Test_acce['SYYTemplateGenerator'],color='y', label='SYY-TemplateGenerator')
-
-    # axes[0].plot(Train_acce['SYYError'], ls='--',color='orange')
-    # axes[0].plot(Test_acce['SYYError'],color='orange', label='SYY-Error')
-
-
-    # # axes[0].plot(results['SYYBP_Train'][:,1],  color='lightgrey', label='SYYBP %.2f'%results['SYYBP_Test'][0,1])
-    # axes[0].plot(results['SYYDecoderRobustOutput_Train'][:,1],  color='lightgrey', label='SYYDecoderRobustOutput %.2f'%results['SYYDecoderRobustOutput_Test'][0,1])
+            axes[0].plot(Test_corrd[method], color=colors[method], label=method)
 
     axes[0].set_xlabel('epoch')
     axes[0].set_ylabel('Reconstruction correlation')
@@ -275,3 +240,12 @@ else:
     fig.savefig(resultsdir+'corrd_results_%depochs.png'%args.epochs, dpi=200)
 
     plt.clf()
+
+    print('************')
+    for method in methods:
+
+        print('Train corrD','%s:'%method, Train_corrd[method][-1], end =" ")
+    print('************')
+    for method in methods:    
+        print('Test corrD','%s:'%method, Test_corrd[method][-1], end =" ")
+    print('************')

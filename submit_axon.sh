@@ -1,63 +1,60 @@
 #!/bin/sh
-#SBATCH --job-name=Toy # The job name.
-#SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_ToyModels.%j.out # STDOUT
+#SBATCH --job-name=Symbio # The job name.
+#SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
 #SBATCH -c 16
 #SBATCH --gres=gpu:4
 #SBATCH --mem=24gb
 #SBATCH 
 
-printf "********************************************************** \n"
-printf " replicate AsymResNet track_running False \n"
-# printf " Finally test is not that bad, even when using track_mean=True \n"
-# printf " 1) I excluded bn form prameters to be exchanged in toggle_state_dict_FF_to_FB \n"
-# printf " 2) using the latent before forward weight update \n"
-# printf " the new problem is overfitting  \n"
-# printf " Examining BN, testing new toggle_FFtoFB , Resnet10 MNIST optimizers\n"
-printf "********************************************************** \n"
 
-
-now=$(date +'%Y-%m-%d_%H-%M')
 module load anaconda3-2019.03
 
-# source activate /axsys/home/tt2684/conda-envs/pytorch_tensorflow_cuttingedge
-# source activate pytorch_tensorflow_SYNPAI
-# source activate /axsys/home/tt2684/conda-envs/pytorch_tensorflow_SYNPAI_CUDA10
-source activate /axsys/home/tt2684/conda-envs/pytorch_tensorflow_SYNPAI_CUDA100cudnn75
+source activate /home/tt2684/conda-envs/pytorch_tensorflow_SYNPAI_CUDA100cudnn75
+
+now=$(date +'%Y-%m-%d_%H-%M')
+note='learning_scheduler_of_decoder_depends_on_its_own_cost'
+
+printf "********************************************************** \n"
+
+printf " $note \n"
+
+printf "********************************************************** \n"
 
 ####Command to execute Python program
 config=0
-# python -u create_config.py -dataset CIFAR10 -j 16 --base_channels 64 --batch-size 256 --epoch 400 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100; config=1  #
+# python -u create_config.py -dataset MNIST -j 16 --base_channels 64 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
 if [ $config == 0 ]
     then
-    runname='Jan08-14-54_b479c8f095_460'  #'Dec30-16-38_04f1282767_1'   #'Dec29-10-13_fd73bdce0b_2'  #Dec06-23-07_81c6b0578b_2' #'Dec06-12-23_81c6b0578b_2'   #'Dec06-09-41_81c6b0578b_2' #'Dec06-12-09_81c6b0578b_2'
-    # configpath="/axsys/scratch/issa/users/tt2684/Research/Results/Toy_models/ConvMNIST_playground/$runname/configs.yml"
-    configpath="/axsys/scratch/issa/users/tt2684/Research/Results/Toy_models/SYY2020/$runname/configs.yml"
+    runname='Jan17-10-51_fc540af17a_278'  #'Jan15-11-58_fc540af17a_346'  #'Jan15-11-38_fc540af17a_617'  #'Jan15-11-58_fc540af17a_346'  #   #'Dec30-16-38_04f1282767_1'   #'Dec29-10-13_fd73bdce0b_2'  #Dec06-23-07_81c6b0578b_2' #'Dec06-12-23_81c6b0578b_2'   #'Dec06-09-41_81c6b0578b_2' #'Dec06-12-09_81c6b0578b_2'
+    configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
 
-    # python -u main_train.py --method SYYVanilla  --config-file $configpath
+    # python -u main_train.py --method BSL  --config-file $configpath
+    # python -u main_train.py --method SLVanilla  --config-file $configpath
     # python -u main_train.py --method FA  --config-file $configpath
     # python -u main_train.py --method BP  --config-file $configpath
-    # python -u main_train.py --method SYYDecoderRobustOutput  --config-file $configpath
-    # python -u main_train.py --method SYYError  --config-file $configpath
-    # python -u main_train.py --method SYYDecoderRobustOnehot  --config-file $configpath
-    # python -u main_train.py --method SYYTemplateGenerator  --config-file $configpath
+    # python -u main_train.py --method SLDecoderRobustOutput  --config-file $configpath
+    python -u main_train.py --method SLError  --config-file $configpath
+    # python -u main_train.py --method SLDecoderRobustOnehot  --config-file $configpath
+    # python -u main_train.py --method SLTemplateGenerator  --config-file $configpath
+    # python -u main_train.py --method SLRobust  --config-file $configpath
 
-    # python -u main_train_SYYtarget.py --method SYYVanilla  --config-file $configpath
+    # python -u main_train.py --method SLErrorTemplateGenerator  --config-file $configpath
+
+    # python -u main_train_SLtarget.py --method SLVanilla  --config-file $configpath
 
 
-    python -u generate_figures.py --config-file $configpath
-
-
+    # python -u generate_figures.py --config-file $configpath
 
     # python -u main_evaluate_withimages.py --eval_save_sample_images True  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time $now
 
     # ## robustness evaluation
-    # methods='BP FA SYYVanilla'
+    # methods='SLRobust SLVanilla BP FA SLErrorTemplateGenerator'
     # for method in $methods
     # do 
     # for eval_epsilon in `seq 0.0 0.2 1.0`
     # do 
-    # for eval_sigma2 in `seq 0.0 0.5 2`
+    # for eval_sigma2 in `seq 0.0 0.5 1`
     # do
     # echo $method
     # echo $eval_sigma2
@@ -67,7 +64,7 @@ if [ $config == 0 ]
     # done
     # done
     
-    # python -u generate_figures.py --eval_robust True --eval_time 2020-01-09_17-07 --config-file $configpath
+    # python -u generate_figures.py --eval_robust True --eval_time 2020-01-16_22-22 --config-file $configpath
     
     fi
 #------------ history

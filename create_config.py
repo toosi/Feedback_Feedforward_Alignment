@@ -20,12 +20,9 @@ from torchvision import datasets, transforms
 import torch.nn.functional as F
 from torchvision import models as torchmodels
 import matplotlib.pylab as plt
-from models import toy_models_using_lossbackward as models
 
-from utils import helper_functions
 from utils import state_dict_utils
 
-VanillaBackprop = helper_functions.VanillaBackprop
 #%%
 toggle_state_dict = state_dict_utils.toggle_state_dict
 # toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
@@ -42,6 +39,7 @@ model_names = sorted(name for name in torchmodels.__dict__
     and callable(torchmodels.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='Pytorch Training')
+parser.add_argument('--note', default=None, type=str)
 parser.add_argument('-time', default='Now', type=str)
 parser.add_argument('--hash', dest='hash', default=None,
                     help='None to get random hash or int')
@@ -78,7 +76,7 @@ if socket.gethostname()[0:4] in  ['node','holm','wats']:
 elif socket.gethostname() == 'SYNPAI':
     path_prefix = '/hdd6gig/Documents/Research'
 elif socket.gethostname()[0:2] == 'ax':
-    path_prefix = '/scratch/issa/users/tt2684/Research'
+    path_prefix = '/home/tt2684/Research'
 
 
 parser.add_argument('--base_channels', default=64, type=int, metavar='N',
@@ -183,12 +181,12 @@ if args.hash is None:
 else:
     hash = args.hash
 
-project = 'SYY2020' #'SYY_MINST'
+project = 'Symbio' #'SYY_MINST'
 arch = 'E%sD%s'%(args.arche, args.archd)
 
 args.imagesetdir = path_prefix+'/Data/'
 args.runname = rundatetime+'_%s_'%commit[0:min(len(commit), 10)]+str(hash)
-args.resultsdir = path_prefix+'/Results/Toy_models/SYY2020/%s/'%args.runname
+args.resultsdir = path_prefix+'/Results/Symbio/Symbio/%s/'%args.runname
 args.tensorboarddir = path_prefix + '/Results/Tensorboard_runs/runs'+'/%s/'%project +args.runname
 args.path_prefix = path_prefix
 args.path_save_model = path_prefix+'/Models/%s_trained/%s/%s/%s/'%(args.dataset,project,arch,args.runname)

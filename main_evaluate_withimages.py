@@ -66,7 +66,7 @@ if socket.gethostname()[0:4] in  ['node','holm','wats']:
 elif socket.gethostname() == 'SYNPAI':
     path_prefix = '/hdd6gig/Documents/Research'
 elif socket.gethostname()[0:2] == 'ax':
-    path_prefix = '/scratch/issa/users/tt2684/Research'
+    path_prefix = '/home/tt2684/Research'
 
 parser = argparse.ArgumentParser(description='PyTorch Training')
 parser.add_argument(
