@@ -45,9 +45,9 @@ if not(hasattr(args, 'databasedir')):
     args.databasedir  = path_prefix+'/Results/database/%s/%s/%s/'%(project,arch,args.dataset)
 
 
-methods = ['BP', 'FA', 'SLVanilla','SLRobust', 'SLErrorTemplateGenerator']#, 'SLErrorTemplateGenerator' 'SLError', 
+methods = ['BP', 'FA', 'SLVanilla','SLRobust',  'SLError']#,'BSL',  'SLErrorTemplateGenerator' 'SLError', 
 colors =  {'BP':'k', 'FA':'grey', 'SLVanilla':'r','SLRobust':'salmon',
-            'SLError':'orange', 'SLErrorTemplateGenerator':'yellow'}
+            'SLError':'orange', 'SLErrorTemplateGenerator':'yellow', 'BSL':'b'}
 
 if args.eval_robust:
     sigma2 = 0.0

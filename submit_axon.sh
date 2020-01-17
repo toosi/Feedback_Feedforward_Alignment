@@ -26,7 +26,7 @@ config=0
 
 if [ $config == 0 ]
     then
-    runname='Jan17-10-51_fc540af17a_278'  #'Jan15-11-58_fc540af17a_346'  #'Jan15-11-38_fc540af17a_617'  #'Jan15-11-58_fc540af17a_346'  #   #'Dec30-16-38_04f1282767_1'   #'Dec29-10-13_fd73bdce0b_2'  #Dec06-23-07_81c6b0578b_2' #'Dec06-12-23_81c6b0578b_2'   #'Dec06-09-41_81c6b0578b_2' #'Dec06-12-09_81c6b0578b_2'
+    runname='Jan17-08-53_fc540af17a_325'  #'Jan15-11-58_fc540af17a_346'  #'Jan15-11-38_fc540af17a_617'  #'Jan15-11-58_fc540af17a_346'  #   #'Dec30-16-38_04f1282767_1'   #'Dec29-10-13_fd73bdce0b_2'  #Dec06-23-07_81c6b0578b_2' #'Dec06-12-23_81c6b0578b_2'   #'Dec06-09-41_81c6b0578b_2' #'Dec06-12-09_81c6b0578b_2'
     configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
 
     # python -u main_train.py --method BSL  --config-file $configpath
@@ -34,7 +34,7 @@ if [ $config == 0 ]
     # python -u main_train.py --method FA  --config-file $configpath
     # python -u main_train.py --method BP  --config-file $configpath
     # python -u main_train.py --method SLDecoderRobustOutput  --config-file $configpath
-    python -u main_train.py --method SLError  --config-file $configpath
+    # python -u main_train.py --method SLError  --config-file $configpath
     # python -u main_train.py --method SLDecoderRobustOnehot  --config-file $configpath
     # python -u main_train.py --method SLTemplateGenerator  --config-file $configpath
     # python -u main_train.py --method SLRobust  --config-file $configpath
@@ -49,7 +49,7 @@ if [ $config == 0 ]
     # python -u main_evaluate_withimages.py --eval_save_sample_images True  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time $now
 
     # ## robustness evaluation
-    # methods='SLRobust SLVanilla BP FA SLErrorTemplateGenerator'
+    # methods='SLRobust SLVanilla BP FA SLError'
     # for method in $methods
     # do 
     # for eval_epsilon in `seq 0.0 0.2 1.0`

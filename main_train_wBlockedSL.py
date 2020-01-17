@@ -595,6 +595,17 @@ def main_worker(gpu, ngpus_per_node, args):
                 fp.write("\n")
 
     if args.method == 'BSL':
+        # a json to keep the records
+        run_json_dict = {}
+        Train_acce_list = []
+        Train_corrd_list = []
+        Train_lossd_list= []
+
+        Test_acce_list  = []
+        Test_corrd_list = []
+        Test_lossd_list = []
+
+        lrF_list = []
 
         modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))
 
@@ -906,7 +917,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
 
             latents,  _ = modelF(images)
             recons = modelB(latents.detach())
-            
+
             if args.method == 'SLTemplateGenerator':
                 repb = onehot.detach()#modelB(onehot.detach())
                 
