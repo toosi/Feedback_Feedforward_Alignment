@@ -79,3 +79,22 @@ def generate_sample_images(images, target, title, param_dict, args):
     fig.savefig(args.resultsdir+'%s_samples_eval%s_%s_%s.pdf'%(title, args.eval_time, args.method, param_dict), dpi=200)
     print('%s_samples_eval%s_%s_%s.png saved at %s'%(title, args.eval_time, args.method, param_dict, args.resultsdir))
     plt.clf()
+
+
+def load_dataset(data_path):
+
+    """
+    load imagesets from pytorch-friendly organized image  folders
+    """
+    
+    train_dataset = torchvision.datasets.ImageFolder(
+        root=data_path,
+        transform=torchvision.transforms.ToTensor()
+    )
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=64,
+        num_workers=0,
+        shuffle=True
+    )
+    return train_loader

@@ -37,13 +37,19 @@ import torch
 from torchvision import datasets, transforms
 import torch.nn.functional as F
 import matplotlib
-import matplotlib.pylab as plt
 matplotlib.use('agg')
+import matplotlib.pylab as plt
+from PIL import Image
+import matplotlib.image as mpimg
+
 import pprint 
 pp = pprint.PrettyPrinter(indent=4)
 
-from utils import helper_functions
+
+import pytorch_ssim
+
 from utils import state_dict_utils
+from utils import helper_functions
 
 toggle_state_dict = state_dict_utils.toggle_state_dict
 # toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
@@ -83,6 +89,8 @@ parser.add_argument('--eval_epsilon', type=float, default=0,
                     help='epsilon in FGSM attack')
 parser.add_argument('--eval_sigma2', type=float, default=0, 
                     help='added guassian noise sigma2')
+parser.add_argument('--eval_save_sample_images', type=bool, default=False, 
+                    help='save sample images')
 
 args = parser.parse_args()
 assert args.config_file, 'Please specify a config file path'
@@ -264,7 +272,10 @@ def main_worker(gpu, ngpus_per_node, args):
     
     # define loss function (criterion) and optimizer
     criterione = nn.CrossEntropyLoss().cuda(args.gpu)                                                                                       
-    criteriond = nn.MSELoss().cuda(args.gpu)
+    if args.lossfuncB == 'MSELoss':                                                                                       
+        criteriond = nn.MSELoss().cuda(args.gpu)
+    elif args.lossfuncB == 'SSIM':
+        criteriond = pytorch_ssim.SSIM(window_size = int(input_size/10))
 
     if 'fixup' in args.arche:
         parameters_bias = [p[1] for p in modelF.named_parameters() if 'bias' in p[0]]
@@ -304,9 +315,9 @@ def main_worker(gpu, ngpus_per_node, args):
     schedulerF = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerF, 'max', patience=args.patiencee, factor=args.factore)
     schedulerB = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerB, 'max', patience=args.patienced, factor=args.factord)
 
-    # ------Trained!
+    # ------load Trained models ---------
     modelF_trained = torch.load(args.path_save_model+'checkpointe_%s.pth.tar'%args.method)['state_dict']
-    if args.method.startswith('SYY'):
+    if args.method.startswith('SL') or args.method == 'BSL':
         modelB_trained = torch.load(args.path_save_model+'checkpointd_%s.pth.tar'%args.method)['state_dict']
     else:
         modelB_trained= toggle_state_dict_BPtoYY(modelF_trained, modelB.state_dict())
@@ -315,8 +326,6 @@ def main_worker(gpu, ngpus_per_node, args):
     modelF.load_state_dict(modelF_trained)
     modelB.load_state_dict(modelB_trained)
 
-
-    
     
     # Data loading code
     if args.dataset == 'imagenet':
@@ -346,9 +355,6 @@ def main_worker(gpu, ngpus_per_node, args):
         test_dataset = getattr(datasets, args.dataset)(root=args.imagesetdir, train=False, download=True, transform=transform_test)
         val_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, drop_last=True)
 
-
-        
-    
     elif 'MNIST' in args.dataset:
         
         transform_test = transforms.Compose([
@@ -427,6 +433,7 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
 
+
     # a json to keep the records
     run_json_dict = {}
     run_json_dict.update(vars(args))
@@ -435,7 +442,9 @@ def main_worker(gpu, ngpus_per_node, args):
     Test_corrd_list = []
     Test_lossd_list = []
     
-    if (args.eval_epsilon == 0):
+    assert (args.eval_sigma2==0) or (args.eval_epsilon == 0), 'Gaussian noise OR adversarial attack, choose one'
+    
+    if (args.eval_epsilon == 0) :
         # evaluate on validation set
         for itr in range(args.eval_maxitr):
 
@@ -454,9 +463,10 @@ def main_worker(gpu, ngpus_per_node, args):
             writer.add_scalar('Test%s/loss'%args.method, test_results[2], itr)
 
 
-    elif args.eval_epsilon>0:
+    elif (args.eval_epsilon>0):
 
         for itr in range(args.eval_maxitr):
+
             _, _, test_results = validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args, itr)
 
             acce = test_results[0]
@@ -470,6 +480,8 @@ def main_worker(gpu, ngpus_per_node, args):
             writer.add_scalar('Test%s/acc1'%args.method, test_results[0], itr)
             writer.add_scalar('Test%s/corr'%args.method, test_results[1], itr)
             writer.add_scalar('Test%s/loss'%args.method, test_results[2], itr)
+    
+    
     
 
     if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
@@ -497,7 +509,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
         len(val_loader),
         [batch_time, losses, m1, m2],
         prefix='Test %s: '%args.method)
-    
+
     if args.gpu is not None:
         
         onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda(args.gpu, non_blocking=True)
@@ -510,6 +522,8 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
     modelB.eval()
 
     not_saved = True
+    not_saved_itr = True
+
     with torch.no_grad():
         end = time.time()
         for i, (images, target) in enumerate(val_loader):
@@ -521,39 +535,29 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
             else:
                 images = images.cuda()
                 target = target.cuda()
-
+            
             onehot.zero_()
             onehot.scatter_(1, target.view(target.shape[0], 1), 1)
 
-            
             if 'MNIST' in args.dataset  and args.arche[0:2]!='FC':
                 images= images.expand(-1, 1, -1, -1) #images.expand(-1, 3, -1, -1)
             
             # ----- encoder ---------------------
             images_noisy = images + torch.empty_like(images).normal_(mean=0, std=np.sqrt(sigma2)).cuda()
             
-            # if (args.save_images) and not_saved:
-            #     not_saved = True
-            #     fig, axes = plt.subplots(nrows=1, ncols=5, figsize=[10,4])
-            #     for im in range(5):
-            #         axes.imshow(images_noisy[im].squeeze().numpy())
+            if (args.eval_save_sample_images) and not_saved:
+                not_saved = False
+                helper_functions.generate_sample_images(images, target, title='original', param_dict={}, args=args)
+                helper_functions.generate_sample_images(images_noisy, target, title='noisy inputs', param_dict={'sigma2':sigma2}, args=args)
 
             # compute output
             latents, output = modelF(images_noisy)
-            losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
             # ----- decoder ------------------ 
-
-            latents,  _ = modelF(images_noisy)
-            recons = modelB(latents.detach())
-
-            # measure accuracy and record loss
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            top1.update(acc1[0].item(), images.size(0))
-
+            recons_before_interpolation = modelB(latents.detach()) 
+            recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
+            
             if args.method == 'SLTemplateGenerator':
                 repb = onehot.detach()#modelB(onehot.detach())
-                
-                
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
@@ -566,9 +570,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                 gener = targetproj
                 reference = inputs_avgcat
 
-            elif args.method in ['SLVanilla','BP','FA']:
-                gener = recons
-                reference = images
+            
             
             elif args.method == 'SLError':
                 #TODO: check the norm of subtracts
@@ -602,22 +604,23 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
             
                 gener = targetproj
                 reference = inputs_avgcat
-            
+
+            else:# args.method in ['SLVanilla','BP','FA']:
+                gener = recons
+                reference = images
+
+        
+
             for _ in range(itr):
                 # compute output
                 latents, output = modelF(gener.detach())
-                recons = modelB(latents.detach())
 
-                losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
-
-                # measure accuracy and record loss
-                acc1, acc5 = accuracy(output, target, topk=(1, 5))
-                top1.update(acc1[0].item(), images.size(0))
                 # ----- decoder ------------------ 
+                recons_before_interpolation = modelB(latents.detach()) 
+                recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
+
                 if args.method == 'SLTemplateGenerator':
                     repb = onehot.detach()#modelB(onehot.detach())
-                    
-                    
                     repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                             
                             
@@ -629,10 +632,6 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                 
                     gener = targetproj
                     reference = inputs_avgcat
-
-                elif args.method in ['SLVanilla','BP','FA']:
-                    gener = recons
-                    reference = images
                 
                 elif args.method == 'SLError':
                     #TODO: check the norm of subtracts
@@ -656,23 +655,34 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                     
                     
                     repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                            
-                            
                     targetproj = modelB(repb) #, switches
 
                     inputs_avgcat = torch.zeros_like(images)
                     for t in torch.unique(target):
                         inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
-                
+            
                     gener = targetproj
                     reference = inputs_avgcat
                 
-            reference = F.interpolate(reference, size=gener.shape[-1])
-
-            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+                else: # args.method in ['SLVanilla','BP','FA']:
+                    gener = recons
+                    reference = images
+            
+            
+            if (args.eval_save_sample_images) and not_saved_itr:
+                not_saved_itr = False
+                helper_functions.generate_sample_images(gener, target, title='gener by '+args.method, param_dict={'sigma2':sigma2, 'itr':itr}, args=args)
 
             
+            # measure accuracy and record loss
+            losse = criterione(output, target) 
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            top1.update(acc1[0].item(), images.size(0))
+
             # measure correlation and record loss
+            reference = F.interpolate(reference, size=gener.shape[-1])
+            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+
             pcorr = correlation(gener, reference)
             losses.update(lossd.item(), images.size(0))
             corr.update(pcorr, images.size(0))
@@ -725,17 +735,21 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
         [batch_time, losses, m1, m2],
         prefix='Test %s: '%args.method)
 
-
-
     if args.gpu is not None:
         
         onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda(args.gpu, non_blocking=True)
     else:
         onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda()
 
+
+
     # switch to evaluate mode
     modelF.eval()
     modelB.eval()
+
+    not_saved = True
+    not_saved_itr = True
+
     
     end = time.time()
     for i, (images, target) in enumerate(val_loader):
@@ -747,7 +761,7 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
         else:
             images = images.cuda()
             target = target.cuda()
-        
+
         onehot.zero_()
         onehot.scatter_(1, target.view(target.shape[0], 1), 1)
 
@@ -782,6 +796,11 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
         perturbed_images = fgsm_attack(images, args.eval_epsilon, images_grad)
         latents, output = modelF(perturbed_images)
 
+        if (args.eval_save_sample_images) and not_saved:
+                not_saved = False
+                helper_functions.generate_sample_images(images.detach(), target, title='original', param_dict={}, args=args)
+                helper_functions.generate_sample_images(perturbed_images.detach(), target, title='perturbed inputs by %s'%args.method, param_dict={'epsilon':args.eval_epsilon}, args=args)
+
         losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
 
         # measure accuracy and record loss
@@ -789,16 +808,12 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
         top1.update(acc1[0].item(), images.size(0))
 
         # ----- decoder ------------------ 
-
-        latents,  _ = modelF(perturbed_images)
         recons = modelB(latents.detach())
+
         
         if args.method == 'SLTemplateGenerator':
-            repb = onehot.detach()#modelB(onehot.detach())
-            
-            
-            repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                    
+            repb = onehot.detach()#modelB(onehot.detach())           
+            repb = repb.view(args.batch_size, args.n_classes, 1, 1)                   
                     
             targetproj = modelB(repb) #, switches
 
@@ -817,7 +832,7 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
             repb = onehot - prob
             repb = repb.view(args.batch_size, args.n_classes, 1, 1)
             gener = modelB(repb.detach())
-            reference = images - F.interpolate(recons, size=images.shape[-1])
+            reference = images - F.interpolate(gener, size=images.shape[-1])
 
         elif args.method == 'SLRobust':
             
@@ -848,28 +863,20 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
             gener = recons
             reference = images
         
-        reference = F.interpolate(reference, size=gener.shape[-1])
-
-        lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
-        # measure correlation and record loss
-        pcorr = correlation(gener, reference)
-        losses.update(lossd.item(), images.size(0))
-        corr.update(pcorr, images.size(0))
+        
 
         for _ in range(itr):
+
             # compute output
             latents, output = modelF(gener.detach())
-
             # ----- decoder ------------------ 
-
             recons = modelB(latents.detach())
+
             if args.method == 'SLTemplateGenerator':
-                repb = onehot.detach()#modelB(onehot.detach())
-                
-                
+
+                repb = onehot.detach()#modelB(onehot.detach())    
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                        
-                        
+                                  
                 targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
@@ -879,11 +886,9 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
                 gener = targetproj
                 reference = inputs_avgcat
 
-            elif args.method in ['SLVanilla','BP','FA']:
-                gener = recons
-                reference = images
             
             elif args.method == 'SLError':
+
                 #TODO: check the norm of subtracts
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob
@@ -900,10 +905,9 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
                 reference = images 
 
             elif args.method == 'SLErrorTemplateGenerator':
+
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob#modelB(onehot.detach())
-                
-                
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
@@ -916,22 +920,27 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
                 gener = targetproj
                 reference = inputs_avgcat
             
+            else: # args.method in ['SLVanilla','BP','FA']:
+                gener = recons
+                reference = images
+            
+                    
+        if (args.eval_save_sample_images) and not_saved_itr:
+            not_saved_itr = False
+            helper_functions.generate_sample_images(gener.detach(), target, title='gener by '+args.method, param_dict={'epsilon':args.eval_epsilon, 'itr':itr}, args=args)
 
-            losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
-
-            # measure accuracy and record loss
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            top1.update(acc1[0].item(), images.size(0))
-
-
-            reference = F.interpolate(reference, size=gener.shape[-1])
-
-            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
-
-            # measure correlation and record loss
-            pcorr = correlation(gener, reference)
-            losses.update(lossd.item(), images.size(0))
-            corr.update(pcorr, images.size(0))
+        
+        # measure accuracy and record loss
+        losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        top1.update(acc1[0].item(), images.size(0))
+        
+        reference = F.interpolate(reference, size=gener.shape[-1])
+        lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+        # measure correlation and record loss
+        pcorr = correlation(gener, reference)
+        losses.update(lossd.item(), images.size(0))
+        corr.update(pcorr, images.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)

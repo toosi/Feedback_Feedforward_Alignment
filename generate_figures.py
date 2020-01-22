@@ -45,7 +45,7 @@ if not(hasattr(args, 'databasedir')):
     args.databasedir  = path_prefix+'/Results/database/%s/%s/%s/'%(project,arch,args.dataset)
 
 
-methods = ['BP', 'FA', 'SLVanilla','SLRobust',  'SLError']#,'BSL',  'SLErrorTemplateGenerator' 'SLError', 
+methods = ['SLVanilla','BP','FA','SLRobust', 'SLError']#,,  ,  ,'BSL',  'SLErrorTemplateGenerator' 'SLError', 
 colors =  {'BP':'k', 'FA':'grey', 'SLVanilla':'r','SLRobust':'salmon',
             'SLError':'orange', 'SLErrorTemplateGenerator':'yellow', 'BSL':'b'}
 
@@ -177,10 +177,10 @@ else:
     for method in methods:
 
         print('Train ACC','%s:'%method, Train_acce[method][-1], end =" ")
-    print('************')
+    print('**')
     for method in methods:    
         print('Test ACC','%s:'%method, Test_acce[method][-1], end =" ")
-    print('************')
+    print('**')
     #------ reconstruction loss ------------
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=[10,6])
 
@@ -210,10 +210,10 @@ else:
     for method in methods:
 
         print('Train LossD','%s:'%method, Train_lossd[method][-1], end =" ")
-    print('************')
+    print('**')
     for method in methods:    
         print('Test LossD','%s:'%method, Test_lossd[method][-1], end =" ")
-    print('************')
+    print('**')
 
 
     #------ reconstruction corr ------------
@@ -245,7 +245,7 @@ else:
     for method in methods:
 
         print('Train corrD','%s:'%method, Train_corrd[method][-1], end =" ")
-    print('************')
+    print('**')
     for method in methods:    
         print('Test corrD','%s:'%method, Test_corrd[method][-1], end =" ")
-    print('************')
+    print('**')

@@ -1,9 +1,9 @@
 #!/bin/sh
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
-#SBATCH -c 16
+#SBATCH -c 20
 #SBATCH --gres=gpu:4
-#SBATCH --mem=24gb
+#SBATCH --mem=48gb
 #SBATCH 
 
 
@@ -12,7 +12,7 @@ module load anaconda3-2019.03
 source activate /home/tt2684/conda-envs/pytorch_tensorflow_SYNPAI_CUDA100cudnn75
 
 now=$(date +'%Y-%m-%d_%H-%M')
-note='learning_scheduler_of_decoder_depends_on_its_own_cost'
+note='**ErrorNorm_learning_scheduler_of_decoder_depends_on_its_own_cost**'
 
 printf "********************************************************** \n"
 
@@ -22,16 +22,16 @@ printf "********************************************************** \n"
 
 ####Command to execute Python program
 config=0
-# python -u create_config.py -dataset MNIST --lossfuncB SSIM  -j 16 --base_channels 64 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py -dataset CIFAR100  -j 24 --input_size 64 --base_channels 64 --batch-size 256 --epoch 400 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
 if [ $config == 0 ]
     then
-    runname='Jan17-10-51_fc540af17a_278'  #'Jan15-11-58_fc540af17a_346'  #'Jan15-11-38_fc540af17a_617'  #'Jan15-11-58_fc540af17a_346'  #   #'Dec30-16-38_04f1282767_1'   #'Dec29-10-13_fd73bdce0b_2'  #Dec06-23-07_81c6b0578b_2' #'Dec06-12-23_81c6b0578b_2'   #'Dec06-09-41_81c6b0578b_2' #'Dec06-12-09_81c6b0578b_2'
+    runname='Jan22-09-38_70f10333a4_236'  #'Jan19-09-23_70f10333a4_657'  #'Jan17-15-32_40a474bced_872'  # 'Jan15-11-58_fc540af17a_346'  #'Jan15-11-38_fc540af17a_617'  #'Jan15-11-58_fc540af17a_346'  #   #'Dec30-16-38_04f1282767_1'   #'Dec29-10-13_fd73bdce0b_2'  #Dec06-23-07_81c6b0578b_2' #'Dec06-12-23_81c6b0578b_2'   #'Dec06-09-41_81c6b0578b_2' #'Dec06-12-09_81c6b0578b_2'
     configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
 
-    # python -u main_train_wBlockedSL.py --method BSL  --config-file $configpath
+    # python -u main_train.py --method BSL  --config-file $configpath
     # python -u main_train.py --method SLVanilla  --config-file $configpath
-    # python -u main_train.py --method FA  --config-file $configpath
+    python -u main_train.py --method FA  --config-file $configpath
     # python -u main_train.py --method BP  --config-file $configpath
     # python -u main_train.py --method SLDecoderRobustOutput  --config-file $configpath
     # python -u main_train.py --method SLError  --config-file $configpath
@@ -46,25 +46,26 @@ if [ $config == 0 ]
 
     # python -u generate_figures.py --config-file $configpath
 
-    # python -u main_evaluate_withimages.py --eval_save_sample_images True  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time $now
+    # python -u main_evaluate.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time $now
 
     # ## robustness evaluation
-    # methods='SLRobust SLVanilla BP FA SLError'
+    # methods='SLVanilla BP FA SLRobust SLError' # SLRobust SLError 
     # for method in $methods
     # do 
     # for eval_epsilon in `seq 0.0 0.2 1.0`
     # do 
-    # for eval_sigma2 in `seq 0.0 0.5 1`
-    # do
+    # # for eval_sigma2 in `seq 0.0 0.0 0.0`
+    # # do
+    # eval_sigma2=0.0
     # echo $method
     # echo $eval_sigma2
     # echo $eval_epsilon
-    # python -u main_evaluate.py --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time $now 
-    # done
+    # python -u main_evaluate.py  --eval_save_sample_images False --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time $now 
+    # # done
     # done
     # done
     
-    python -u generate_figures.py --eval_robust True --eval_time 2020-01-17_13-31 --config-file $configpath
+    # python -u generate_figures.py --eval_robust True --eval_time 2020-01-20_09-13 --config-file $configpath
     
     fi
 #------------ history

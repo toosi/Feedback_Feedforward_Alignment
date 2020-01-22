@@ -81,11 +81,9 @@ elif socket.gethostname()[0:2] == 'ax':
 
 parser.add_argument('--base_channels', default=64, type=int, metavar='N',
                     help='base_channels')
-parser.add_argument('--imagecrop', default=224, type=int, metavar='N',
-                    help='image crop')
 
-parser.add_argument('--imageresize', default=224, type=int, metavar='N',
-                    help='image resize')
+parser.add_argument('--input_size', default=None, type=int, metavar='N',
+                    help='input image size')
 
 parser.add_argument('-j', '--workers', default=12, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
