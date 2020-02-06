@@ -70,6 +70,7 @@ if socket.gethostname()[0:4] in  ['node','holm','wats']:
 elif socket.gethostname() == 'SYNPAI':
     path_prefix = '/hdd6gig/Documents/Research'
 elif socket.gethostname()[0:2] == 'ax':
+    print('running on %s'%socket.gethostname())
     path_prefix = '/home/tt2684/Research'
 
 parser = argparse.ArgumentParser(description='PyTorch Training')
@@ -91,6 +92,10 @@ parser.add_argument('--eval_sigma2', type=float, default=0,
                     help='added guassian noise sigma2')
 parser.add_argument('--eval_save_sample_images', type=bool, default=False, 
                     help='save sample images')
+parser.add_argument('--eval_generate_RDMs', type=bool, default=False, 
+                    help='save sample images')
+parser.add_argument('--eval_neural', type=str, default='', 
+                    help='eval neural mapping not DONE!, e.g. hvmV0')
 
 args = parser.parse_args()
 assert args.config_file, 'Please specify a config file path'
@@ -363,10 +368,34 @@ def main_worker(gpu, ngpus_per_node, args):
         ])
 
         test_dataset = getattr(datasets, args.dataset)(root=args.imagesetdir, train=False, download=True, transform=transform_test)
+        
+        
+        
+
         val_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, drop_last=True)
 
         # n_classes = 10
-        
+    
+
+    if args.eval_generate_RDMs:
+        test_labels = test_dataset.test_labels
+        test_labels = torch.FloatTensor(test_labels)
+        args.n_samples_RDM = 100
+        indices =[]
+        for c in range(args.n_classes):
+            # print(c, torch.nonzero(test_labels == c)[:args.n_samples_RDM].view(-1).shape)
+            
+            indices.extend(torch.nonzero(test_labels == c)[:args.n_samples_RDM].view(-1).numpy())
+        # # StratifiedSampler by ncullen93 added manually to sampler 
+        # sampler = torch.utils.data.sampler.StratifiedSampler(class_vector=test_labels, batch_size=len(test_labels))
+        # args.workers = 1
+        test_dataset_RDM = torch.utils.data.Subset(test_dataset, indices)
+        val_loader = torch.utils.data.DataLoader(test_dataset_RDM, batch_size=args.n_classes*args.n_samples_RDM,  shuffle=False, num_workers=1, drop_last=False)
+
+    if args.eval_neural.startswith('hvm'):
+        variation = args.eval_neural[3:]
+        root_imageset = path_prefix+'/Data/DiCarlo/'
+        val_loader = helper_functions.load_dataset(root_imageset+'hvm%s/'%variation)
 
     # optionally resume from a checkpoint
     if args.resume:
@@ -442,44 +471,61 @@ def main_worker(gpu, ngpus_per_node, args):
     Test_corrd_list = []
     Test_lossd_list = []
     
-    assert (args.eval_sigma2==0) or (args.eval_epsilon == 0), 'Gaussian noise OR adversarial attack, choose one'
+    assert (args.eval_sigma2==0) or (args.eval_epsilon == 0) or args.eval_generate_RDMs, 'Gaussian noise OR adversarial attack, choose one'
     
-    if (args.eval_epsilon == 0) :
-        # evaluate on validation set
-        for itr in range(args.eval_maxitr):
+    if args.eval_generate_RDMs:
 
-            _, _, test_results = validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, args.eval_sigma2)
-            
-            acce = test_results[0]
-            Test_acce_list.extend( [round(test_results[0],3)])
-            Test_corrd_list.extend([round(test_results[1],3)])
-            Test_lossd_list.extend([test_results[2]])
-            run_json_dict.update({'Test_acce':Test_acce_list})
-            run_json_dict.update({'Test_corrd':Test_corrd_list})
-            run_json_dict.update({'Test_lossd':Test_lossd_list})
+        _, _, test_results = generate_RDMs(val_loader, modelF, modelB, criterione, criteriond, args)
+        acce = test_results[0]
+        Test_acce_list.extend( [round(test_results[0],3)])
+        Test_corrd_list.extend([round(test_results[1],3)])
+        Test_lossd_list.extend([test_results[2]])
+        run_json_dict.update({'Test_acce':Test_acce_list})
+        run_json_dict.update({'Test_corrd':Test_corrd_list})
+        run_json_dict.update({'Test_lossd':Test_lossd_list})
 
-            writer.add_scalar('Test%s/acc1'%args.method, test_results[0], itr)
-            writer.add_scalar('Test%s/corr'%args.method, test_results[1], itr)
-            writer.add_scalar('Test%s/loss'%args.method, test_results[2], itr)
+        writer.add_scalar('Test%s/acc1'%args.method, test_results[0], itr)
+        writer.add_scalar('Test%s/corr'%args.method, test_results[1], itr)
+        writer.add_scalar('Test%s/loss'%args.method, test_results[2], itr)
+    else: 
+        if (args.eval_epsilon == 0) :
+            # evaluate on validation set
+            for itr in range(args.eval_maxitr):
+
+                _, _, test_results = validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, args.eval_sigma2)
+                
+                acce = test_results[0]
+                Test_acce_list.extend( [round(test_results[0],3)])
+                Test_corrd_list.extend([round(test_results[1],3)])
+                Test_lossd_list.extend([test_results[2]])
+                run_json_dict.update({'Test_acce':Test_acce_list})
+                run_json_dict.update({'Test_corrd':Test_corrd_list})
+                run_json_dict.update({'Test_lossd':Test_lossd_list})
+
+                writer.add_scalar('Test%s/acc1'%args.method, test_results[0], itr)
+                writer.add_scalar('Test%s/corr'%args.method, test_results[1], itr)
+                writer.add_scalar('Test%s/loss'%args.method, test_results[2], itr)
 
 
-    elif (args.eval_epsilon>0):
+        elif (args.eval_epsilon>0):
 
-        for itr in range(args.eval_maxitr):
+            for itr in range(args.eval_maxitr):
 
-            _, _, test_results = validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args, itr)
+                _, _, test_results = validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args, itr)
 
-            acce = test_results[0]
-            Test_acce_list.extend( [round(test_results[0],3)])
-            Test_corrd_list.extend([round(test_results[1],3)])
-            Test_lossd_list.extend([test_results[2]])
-            run_json_dict.update({'Test_acce':Test_acce_list})
-            run_json_dict.update({'Test_corrd':Test_corrd_list})
-            run_json_dict.update({'Test_lossd':Test_lossd_list})
+                acce = test_results[0]
+                Test_acce_list.extend( [round(test_results[0],3)])
+                Test_corrd_list.extend([round(test_results[1],3)])
+                Test_lossd_list.extend([test_results[2]])
+                run_json_dict.update({'Test_acce':Test_acce_list})
+                run_json_dict.update({'Test_corrd':Test_corrd_list})
+                run_json_dict.update({'Test_lossd':Test_lossd_list})
 
-            writer.add_scalar('Test%s/acc1'%args.method, test_results[0], itr)
-            writer.add_scalar('Test%s/corr'%args.method, test_results[1], itr)
-            writer.add_scalar('Test%s/loss'%args.method, test_results[2], itr)
+                writer.add_scalar('Test%s/acc1'%args.method, test_results[0], itr)
+                writer.add_scalar('Test%s/corr'%args.method, test_results[1], itr)
+                writer.add_scalar('Test%s/loss'%args.method, test_results[2], itr)
+        
+        
     
     
     
@@ -874,7 +920,7 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
 
             if args.method == 'SLTemplateGenerator':
 
-                repb = onehot.detach()#modelB(onehot.detach())    
+                repb = onehot.detach() #modelB(onehot.detach())    
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                                   
                 targetproj = modelB(repb) #, switches
@@ -959,6 +1005,290 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
             
 
     return modelF, modelB, [top1.avg, corr.avg, losses.avg]
+
+
+def generate_RDMs(val_loader, modelF, modelB, criterione, criteriond, args):
+    
+    batch_time = AverageMeter('Time', ':6.3f')
+    losses = AverageMeter('Loss', ':.4e')
+
+    corr = AverageMeter('corr', ':6.2f')
+    top1 = AverageMeter('Acc@1', ':6.2f')
+    m1, m2 = top1, corr
+
+    progress = ProgressMeter(
+        len(val_loader),
+        [batch_time, losses, m1, m2],
+        prefix='Test %s: '%args.method)
+
+    if args.gpu is not None:
+        
+        onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda(args.gpu, non_blocking=True)
+    else:
+        onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda()
+
+
+    # switch to evaluate mode
+    modelF.eval()
+    modelB.eval()
+
+    not_saved = True
+    not_saved_itr = True
+
+    with torch.no_grad():
+        end = time.time()
+        for i, (images, target) in enumerate(val_loader):
+
+            
+            if args.gpu is not None:
+                images = images.cuda(args.gpu, non_blocking=True)
+                target = target.cuda(args.gpu, non_blocking=True)
+            else:
+                images = images.cuda()
+                target = target.cuda()
+            
+
+
+            if 'MNIST' in args.dataset  and args.arche[0:2]!='FC':
+                images= images.expand(-1, 1, -1, -1) #images.expand(-1, 3, -1, -1)
+            
+            # ----- encoder ---------------------
+
+            # compute output
+            latents, output = modelF(images)
+
+
+            
+            # [print(layer[0]) for layer in list(modelF._modules['module']._modules.items())]
+
+            layer = 'conv1'
+            HookF = helper_functions.Hook(modelF._modules['module']._modules[layer])
+            # compute output
+            latents, output = modelF(images)
+            tensor1 = copy.deepcopy(HookF.output)
+
+            RDM_latents_FF = helper_functions.plot_RDMs(tensor=latents, n_samples=args.n_samples_RDM, title='latents-FF', args=args)
+            # print(HookF.input[0].shape, HookF.output.shape)
+            RDM_conv1_FF = helper_functions.plot_RDMs(tensor=HookF.output, n_samples=args.n_samples_RDM, title='%s-FF'%layer, args=args)
+
+            del HookF
+
+            layer = 'conv1'
+            HookF = helper_functions.Hook(modelF._modules['module']._modules[layer])
+            # compute output
+            latents, output = modelF(images)
+
+            # print('pixels', len(HookF.input), HookF.input[0].shape)
+            RDM_pixels = helper_functions.plot_RDMs(tensor=HookF.input[0], n_samples=args.n_samples_RDM, title='pixels', args=args)
+            # helper_functions.plot_RDMs(tensor=images, n_samples=args.n_samples_RDM, title='images', args=args)
+
+            del HookF
+
+
+            # ----- decoder ------------------ 
+            recons_before_interpolation = modelB(latents.detach()) 
+            recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
+            
+            gener = recons
+            reference = images 
+
+            # [print(layer[0]) for layer in list(modelB._modules['module']._modules.items())]
+            layer = 'conv1'
+            HookF = helper_functions.Hook(modelB._modules['module']._modules[layer])
+            recons_before_interpolation = modelB(latents.detach()) 
+
+            RDM_conv1_FB = helper_functions.plot_RDMs(tensor=HookF.output, n_samples=args.n_samples_RDM, title='%s-FB'%layer, args=args)
+            tensor2 = copy.deepcopy(HookF.output)
+
+            helper_functions.generate_spectrum(tensor1=tensor1,title1='%s-FF'%layer,tensor2=tensor2,title2='%s-FB'%layer, args=args)
+
+            
+
+            del HookF
+            layer = 'upsample2'
+            HookF = helper_functions.Hook(modelB._modules['module']._modules[layer])
+            recons_before_interpolation = modelB(latents.detach()) 
+            # print(HookF.input[0].shape, HookF.output.shape)
+            RDM_upsample2 = helper_functions.plot_RDMs(tensor=HookF.output, n_samples=args.n_samples_RDM, title='%s-FB'%layer, args=args)
+
+            print(args.method+': later layers', ss.pearsonr(RDM_upsample2.ravel(), RDM_latents_FF.ravel()))
+            print(args.method+': conv1',ss.pearsonr(RDM_conv1_FF.ravel(), RDM_conv1_FB.ravel()))
+
+            # save RDMs so that we can compare different methods by generate_figures.py
+            hf = h5py.File(args.resultsdir+'RDMs_%s.h5'%args.method, 'w')
+            hf.create_dataset('RDM_upsample2', data=RDM_upsample2)
+            hf.create_dataset('RDM_latents_FF', data=RDM_latents_FF)
+            hf.create_dataset('RDM_conv1_FF', data=RDM_conv1_FF)
+            hf.create_dataset('RDM_conv1_FB', data=RDM_conv1_FB)
+            hf.close()
+
+            recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
+
+            if (args.eval_save_sample_images) and not_saved_itr:
+                not_saved_itr = False
+                helper_functions.generate_sample_images(gener, target, title='gener by '+args.method, param_dict={'sigma2':sigma2, 'itr':itr}, args=args)
+
+            
+            # measure accuracy and record loss
+            losse = criterione(output, target) 
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            top1.update(acc1[0].item(), images.size(0))
+
+            # measure correlation and record loss
+            reference = F.interpolate(reference, size=gener.shape[-1])
+            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+
+            pcorr = correlation(gener, reference)
+            losses.update(lossd.item(), images.size(0))
+            corr.update(pcorr, images.size(0))
+                
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            # if i % args.print_freq == 0:
+            #     progress.display(i)
+
+
+        print('Test avg {method} sigma2 {sigma2} itr: {itr} * lossd {losses.avg:.3f}'
+            .format(method=args.method, sigma2=sigma2, itr=itr,losses=losses), flush=True)
+
+        # TODO: this should also be done with the ProgressMeter
+        print('Test avg  {method} sigma2 {sigma2} itr: {itr} * Acc@1 {top1.avg:.3f}'
+            .format(method=args.method, sigma2=sigma2, itr=itr, top1=top1), flush=True)
+              
+
+    return modelF, modelB, [top1.avg, corr.avg, losses.avg]
+
+
+
+def validate_neural(val_loader, modelF, modelB, criterione, criteriond, args, itr, layer):
+
+    """" not done """
+    batch_time = AverageMeter('Time', ':6.3f')
+    losses = AverageMeter('Loss', ':.4e')
+
+    corr = AverageMeter('corr', ':6.2f')
+    top1 = AverageMeter('Acc@1', ':6.2f')
+    m1, m2 = top1, corr
+
+    progress = ProgressMeter(
+        len(val_loader),
+        [batch_time, losses, m1, m2],
+        prefix='Test %s: '%args.method)
+
+    if args.gpu is not None:
+        
+        onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda(args.gpu, non_blocking=True)
+    else:
+        onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda()
+
+
+    # switch to evaluate mode
+    modelF.eval()
+    modelB.eval()
+
+
+    with torch.no_grad():
+        end = time.time()
+        for i, (images, target) in enumerate(val_loader):
+
+            
+            if args.gpu is not None:
+                images = images.cuda(args.gpu, non_blocking=True)
+                target = target.cuda(args.gpu, non_blocking=True)
+            else:
+                images = images.cuda()
+                target = target.cuda()
+            
+            onehot.zero_()
+            onehot.scatter_(1, target.view(target.shape[0], 1), 1)
+
+            if 'MNIST' in args.dataset  and args.arche[0:2]!='FC':
+                images= images.expand(-1, 1, -1, -1) #images.expand(-1, 3, -1, -1)
+            
+            
+            # compute output
+            latents, output = modelF(images_noisy)
+            # ----- decoder ------------------ 
+            recons_before_interpolation = modelB(latents.detach()) 
+            recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
+            
+            if args.method == 'SLTemplateGenerator':
+                repb = onehot.detach()#modelB(onehot.detach())
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                        
+                        
+                targetproj = modelB(repb) #, switches
+
+                inputs_avgcat = torch.zeros_like(images)
+                for t in torch.unique(target):
+                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
+            
+                gener = targetproj
+                reference = inputs_avgcat
+
+            
+            
+            elif args.method == 'SLError':
+                #TODO: check the norm of subtracts
+                prob = nn.Softmax(dim=1)(output.detach())
+                repb = onehot - prob
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                gener = modelB(repb.detach())
+                reference = images - F.interpolate(recons, size=images.shape[-1])
+
+            elif args.method == 'SLRobust':
+                
+                prob = nn.Softmax(dim=1)(output.detach())
+                repb = onehot - prob
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                gener = modelB(repb.detach())
+                reference = images 
+
+            elif args.method == 'SLErrorTemplateGenerator':
+                prob = nn.Softmax(dim=1)(output.detach())
+                repb = onehot - prob#modelB(onehot.detach())
+                
+                
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                        
+                        
+                targetproj = modelB(repb) #, switches
+
+                inputs_avgcat = torch.zeros_like(images)
+                for t in torch.unique(target):
+                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
+            
+                gener = targetproj
+                reference = inputs_avgcat
+
+            else:# args.method in ['SLVanilla','BP','FA']:
+                gener = recons
+                reference = images
+
+        
+
+                
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            # if i % args.print_freq == 0:
+            #     progress.display(i)
+
+
+        print('Test avg {method} sigma2 {sigma2} itr: {itr} * lossd {losses.avg:.3f}'
+            .format(method=args.method, sigma2=sigma2, itr=itr,losses=losses), flush=True)
+
+        # TODO: this should also be done with the ProgressMeter
+        print('Test avg  {method} sigma2 {sigma2} itr: {itr} * Acc@1 {top1.avg:.3f}'
+            .format(method=args.method, sigma2=sigma2, itr=itr, top1=top1), flush=True)
+              
+
+    return modelF, modelB, [top1.avg, corr.avg, losses.avg]
+
+
 
 
 def save_checkpoint(state, is_best, filepath=args.path_save_model ,filename='checkpoint.pth.tar'):

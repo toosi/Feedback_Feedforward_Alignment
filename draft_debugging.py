@@ -16,37 +16,73 @@ import torch.nn as nn
 # import numpy as np
 # from torchvision import transforms
 # import socket
-
-from models import custom_models as custom_models
+from utils import helper_functions
+Hook = helper_functions.Hook
+from models import custom_models_ResNetLraveled as custom_models
 # print(torch.__version__)
 # from modules import customized_modules
 
 # ConvTranspose2d = customized_modules.AsymmetricFeedbackConvTranspose2d
 # # Conv2d = customized_modules.AsymmetricFeedbackConv2d
 
-arch = 'AsymResNet18BNoMaxP'#'asymresnet18'
-args_model = {'algorithm':'FA'}
-# model = getattr(custom_models, arch)(**args_model)
-model = nn.Sequential(ConvTranspose2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False, output_padding=0)).cuda()
-inputs = torch.zeros([1, 1024, 4, 4]).cuda()
+# arch = 'AsymLNet5F'# 'AsymResNet18BNoMaxP'#'asymresnet18'
+# args_model = {'algorithm':'FA', 'kernel_size':7, 'stride':1}
 
-output = model(inputs)
+arch = 'AsymResLNet10F'# 'AsymResNet18BNoMaxP'#'asymresnet18'
+args_model = {'algorithm':'FA', 'kernel_size':7, 'stride':2}
 
-# import torch.nn as nn
-# import torch
+model = getattr(custom_models, arch)(**args_model).cuda()
+# model = nn.Sequential(ConvTranspose2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False, output_padding=0)).cuda()
+inputs = torch.zeros([6, 3, 32, 32]).cuda()
 
-# device = torch.device("cuda:0")
 
-# # This model doesn't throw the error
-# # t = nn.Sequential(nn.Conv3d(3,128, (9,4,4), stride=(1,2,2), padding=(0,1,1)), nn.ReLU(True), nn.Conv3d(128,256, (1,4,4), stride=(1,2,2), padding=(0,1,1)), nn.ReLU(),nn.Conv3d(256,256, (1,4,4), stride=(1,2,2), padding=(0,1,1))).to(device)
 
-# t = nn.Sequential(nn.Conv3d(3,256, (9,4,4), stride=(1,2,2), padding=(0,1,1)), nn.ReLU(True), nn.Conv3d(256,512, (1,4,4), stride=(1,2,2), padding=(0,1,1)), nn.ReLU(),nn.Conv3d(512,512, (1,4,4), stride=(1,2,2), padding=(0,1,1))).to(device)
-# i = torch.ones([10, 3, 9, 64, 96]).to(device)
-# o = t(i)
-# criterion = nn.L1Loss()
-# loss = criterion(o, torch.ones_like(o))
-# loss.backward()
-# print('done!')
+[print(layer[0]) for layer in list(model._modules.items())]
+
+hookF = {}
+[hookF.update({layer[0]:Hook(layer[1])}) for layer in list(model._modules.items())]
+
+model._modules['conv1']
+latents, output = model(inputs)
+print('latent shape', latents.shape)
+
+print('conv1', len(hookF['conv1'].input), len(hookF['conv1'].output))
+print('conv1', hookF['conv1'].input[0].shape,  hookF['conv1'].output.shape)
+
+# patch_size = 16
+# patches = inputs.unfold(1, 3, 3).unfold(2, patch_size, patch_size).unfold(3, patch_size, patch_size).squeeze()
+# print(patches.shape)
+# latents, output = model(patches[:,0,1].squeeze())
+
+# print(latents.shape)
+
+        
+# # latents = torch.zeros_like(modelF(images[:,:,0:patch_size,0:patch_size]))
+# latent_size = model(inputs[:,:,0:patch_size,0:patch_size])[0].shape[2]
+# Latents_spaital = torch.zeros_like(model(inputs[:,:,0:patch_size,0:patch_size])[0]).repeat(4*4, 1, 1, 1, 1)
+# print('Latents_spaital.shape',Latents_spaital.shape)
+# s = 0
+# for r in range(4):
+#     for c in range(4):
+#         # print('model(patches[:,r,c].squeeze())[0].shape',model(patches[:,r,c].squeeze())[0].shape)
+#         Latents_spaital[s] =  model(patches[:,r,c].squeeze())[0]
+#         s += 1
+# Latents_spaital = Latents_spaital.permute(1, 2, 0, 3, 4)
+# Latents_spaital = Latents_spaital.reshape(256, 10, 16, 4, 4)
+# pooled = torch.nn.functional.avg_pool3d(Latents_spaital, (16,4,4))
+# print('pooled',pooled.shape)
+
+# ------ Backward -----------
+arch = 'AsymResLNet10B'# 'AsymResNet18BNoMaxP'#'asymresnet18'
+args_model = {'algorithm':'FA', 'kernel_size':7, 'stride':2}
+
+model = getattr(custom_models, arch)(**args_model).cuda()
+# model = nn.Sequential(ConvTranspose2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False, output_padding=0)).cuda()
+output = model(latents.detach())
+
+print(output.shape)
+
+
 
 
 # #%%

@@ -4,6 +4,7 @@ import os
 import json
 from utils import helper_functions
 import yaml
+import scipy.stats as ss
 find = helper_functions.find
 import matplotlib
 matplotlib.use('agg')
@@ -29,6 +30,9 @@ parser.add_argument(
 parser.add_argument(
         '--eval_time',
         dest='eval_time',type=str)
+parser.add_argument(
+        '--eval_RDMs',
+        dest='eval_RDMs',default=False)
 
 args = parser.parse_args()
 if args.config_file:
@@ -45,9 +49,22 @@ if not(hasattr(args, 'databasedir')):
     args.databasedir  = path_prefix+'/Results/database/%s/%s/%s/'%(project,arch,args.dataset)
 
 
-methods = ['SLVanilla','BP','FA','SLRobust', 'SLError']#,,  ,  ,'BSL',  'SLErrorTemplateGenerator' 'SLError', 
+methods = ['BP','FA','SLVanilla' ]#','SLRobust', 'SLError''SLRobust', 'SLError' ,'BSL',  'SLErrorTemplateGenerator' 'SLError', 
 colors =  {'BP':'k', 'FA':'grey', 'SLVanilla':'r','SLRobust':'salmon',
             'SLError':'orange', 'SLErrorTemplateGenerator':'yellow', 'BSL':'b'}
+
+if args.eval_RDMs:
+    RDMs_dict = {}
+    layers = ['RDM_conv1_FF', 'RDM_conv1_FB', 'RDM_latents_FF', 'RDM_upsample2',]
+    import h5py
+    for method in  methods:
+        hf = h5py.File(args.resultsdir+'RDMs_%s.h5'%method, 'r')
+        
+        RDM_list = [np.array(hf.get(layers[0])),
+        np.array(hf.get(layers[1])),
+        np.array(hf.get(layers[2])),
+        np.array(hf.get(layers[3]))]
+        RDMs_dict.update({method:RDM_list}) 
 
 if args.eval_robust:
     sigma2 = 0.0
@@ -106,9 +123,80 @@ pp.pprint(vars(args))
 #     results.update({k:r})
 # print(results.keys())
 
+if args.eval_RDMs:
+    # bar plots
+    corrs = [ss.pearsonr(RDMs_dict['BP'][l].ravel(), RDMs_dict['SLVanilla'][l].ravel())[0] for l in range(4)]
+    fig, axes = plt.subplots(nrows=1, ncols=1, figsize=[5.5,4])
+    
+    width = 0.35
+    dist = width/4
+
+    l=0
+    axes.bar([0],1-ss.pearsonr(RDMs_dict['BP'][l].ravel(), RDMs_dict['SLVanilla'][l].ravel())[0],width=width, label='1st layer-forward', color='salmon')
+    l=1
+    axes.bar([width+dist],1-ss.pearsonr(RDMs_dict['BP'][l].ravel(), RDMs_dict['SLVanilla'][l].ravel())[0],width=width, label='1st layer-feedback',color='r')
+    l=2
+    axes.bar([0.5+3/2*width+2*dist],1-ss.pearsonr(RDMs_dict['BP'][l].ravel(), RDMs_dict['SLVanilla'][l].ravel())[0],width=width, label='top layer-forward',color='lightblue')
+    l=3
+    axes.bar([0.5+5/2*width+3*dist],1-ss.pearsonr(RDMs_dict['BP'][l].ravel(), RDMs_dict['SLVanilla'][l].ravel())[0],width=width, label='top layer-feedback',color='b')
+    
+    mixed_1st_layer_SLVanilla = np.concatenate((RDMs_dict['SLVanilla'][0].ravel(),RDMs_dict['SLVanilla'][1].ravel()))
+    mixed_top_layer_SLVanilla = np.concatenate((RDMs_dict['SLVanilla'][2].ravel(),RDMs_dict['SLVanilla'][3].ravel()))
+
+    mixed_1st_layer_BP = np.concatenate((RDMs_dict['BP'][0].ravel(),RDMs_dict['BP'][1].ravel()))
+    mixed_top_layer_BP = np.concatenate((RDMs_dict['BP'][2].ravel(),RDMs_dict['BP'][3].ravel()))
 
 
-if args.eval_robust:
+    print('SHAPE',mixed_1st_layer_BP.shape)
+    axes.bar([1+7/2*width+4*dist],1-ss.pearsonr(mixed_1st_layer_BP, mixed_1st_layer_SLVanilla)[0],width=width, label='1st layer-mixed',color='firebrick')
+    axes.bar([1+9/2*width+5*dist],1-ss.pearsonr(mixed_top_layer_BP, mixed_top_layer_SLVanilla)[0],width=width, label='top layer-mixed',color='darkblue')
+    
+    
+    
+    axes.legend(loc='upper right')
+    axes.set_ylabel('Dissimilarity between RSMs of SL and BP')
+    axes.set_xticks([])
+    ax = plt.gca()
+    ax.patch.set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    plt.tick_params(axis='y',direction='out', right=False)
+    plt.tick_params(axis='x',direction='out', top=False)
+    fig.savefig(args.resultsdir+'Bars_RDMs_comparisons_%s.png'%(args.runname), dpi=200)
+    fig.savefig(args.resultsdir+'Bars_RDMs_comparisons_%s.pdf'%(args.runname), dpi=200)
+    plt.clf()
+
+    #
+
+    # RDM consistencies
+    RDMs_consistencies = np.zeros((len(methods), len(methods), 4))
+    for i, methodi in enumerate(methods):
+        for j, methodj in enumerate(methods):
+            for l in range(4):
+                RDMs_consistencies[i, j , l] = ss.pearsonr(RDMs_dict[methodi][l].ravel(), RDMs_dict[methodj][l].ravel())[0]
+                print(methodi,methodj,RDMs_consistencies[:,:,l ])
+    fig, axes = plt.subplots(nrows=1, ncols=4, figsize=[12,4])
+    for l in range(4):
+        im = axes[l].matshow(RDMs_consistencies[:, : , l], vmin=0, vmax=1, origin='lower', cmap=plt.cm.get_cmap('Spectral_r'))
+        axes[l].set_xticks(range(len(methods)))
+        axes[l].set_xticklabels(methods)
+        if l ==0:
+            axes[l].set_yticks(range(len(methods)))
+            axes[l].set_yticklabels(methods)
+        else:
+            axes[l].set_yticks([])
+
+        
+        axes[l].set_title(layers[l][4:], y=1.25)
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.02, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+    fig.suptitle('Correlation between RDMs %s, %s'%(args.runname, args.dataset))
+    fig.savefig(args.resultsdir+'RDMs_comparisons_%s.png'%(args.runname), dpi=200)
+    fig.savefig(args.resultsdir+'RDMs_comparisons_%s.pdf'%(args.runname), dpi=200)
+    plt.clf()
+
+elif args.eval_robust:
 
     #------ accuracy ------------
     fig, axes = plt.subplots(nrows=1, ncols=4, figsize=[20,4])

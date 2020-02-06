@@ -50,7 +50,7 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
 parser.add_argument('-ae', '--arche', metavar='ARCHE', default='ConvDiscr',
                     choices=model_names+['autoencoder','SeeSaw','See','Saw', 'ResNet18F','AsymResNet10F',\
                          'AsymResNet18F','AsymResNet18FNoBN', 'FCDiscrNet',
-                         'AsymResLNet10FNoMaxP', 'fixup_resnet20', 'fixup_resnet14','AsymResLNet10F','AsymResLNet14F'],
+                         'AsymResLNet10FNoMaxP', 'fixup_resnet20', 'fixup_resnet14','AsymResLNet10F','AsymResLNet14F','AsymResLNetLimited10F','AsymResLNetLimited14F'],
                     help='model architecture: ' +
                         ' | '.join(model_names) +
                         ' (default: resnet18)')

@@ -556,7 +556,7 @@ def main_worker(gpu, ngpus_per_node, args):
         print('*****  lrF=%1e'%(lrF))
         
         # train for one epoch
-        modelF, modelB, train_results = train(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB, schedulerF,schedulerB, epoch, args)
+        modelF, modelB, train_results = train_parallel(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB, schedulerF,schedulerB, epoch, args)
         Train_acce_list.extend( [round(train_results[0],3)])
         Train_corrd_list.extend([round(train_results[1],3)])
         Train_lossd_list.extend([train_results[2]])
@@ -578,7 +578,7 @@ def main_worker(gpu, ngpus_per_node, args):
         # ---- adjust learning rates ----------
 
         adjust_learning_rate(schedulerF, acce)
-        adjust_learning_rate(schedulerB, acce)# corrd
+        adjust_learning_rate(schedulerB, corrd)#acce
 
 
         # remember best acc@1 and save checkpoint
@@ -892,6 +892,208 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
     writer.add_scalar('Train%s/loss'%args.method, losses.avg, epoch)
    
     return modelF, modelB,[top1.avg, corr.avg, losses.avg]
+
+
+def train_parallel(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, optimizerB,schedulerF,schedulerB, epoch, args):
+
+    batch_time = AverageMeter('Time', ':6.3f')
+    data_time = AverageMeter('Data', ':6.3f')
+    losses = AverageMeter('Loss', ':.4e')
+    corr = AverageMeter('corr', ':6.2f')
+    
+    top1 = AverageMeter('Acc@1', ':6.2f')
+    m1, m2 = top1, corr
+    
+    
+    progress = ProgressMeter(
+        len(train_loader),
+        [batch_time, data_time, losses, m1, m2],
+        prefix=args.method + "Epoch: [{}]".format(epoch))
+
+    if args.gpu is not None:
+        
+        onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda(args.gpu, non_blocking=True)
+    else:
+        onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda()
+
+    end = time.time()
+
+    for i, (images, target) in enumerate(train_loader):
+        # measure data ssading time
+        data_time.update(time.time() - end)
+
+        
+        if args.gpu is not None:
+            images = images.cuda(args.gpu, non_blocking=True)
+            target = target.cuda(args.gpu, non_blocking=True)
+        else:
+            images = images.cuda()
+            target = target.cuda()   
+
+        onehot.zero_()
+        onehot.scatter_(1, target.view(target.shape[0], 1), 1)
+        
+        if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
+            images= images.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1)
+
+        
+
+        # # ----- encoder ---------------------
+        # switch to train mode
+        modelF.train()
+           
+        # compute output
+        patch_size = 16
+        patches = images.unfold(1, 3, 3).unfold(2, patch_size, patch_size).unfold(3, patch_size, patch_size).squeeze()
+        
+        # latents = torch.zeros_like(modelF(images[:,:,0:patch_size,0:patch_size]))
+        latent_size = modelF(images[:,:,0:patch_size,0:patch_size])[0].shape[2]
+        Latents_spaital = torch.zeros_like(modelF(images[:,:,0:patch_size,0:patch_size])[0]).repeat(4*4 ,1, 1, 1, 1)
+        s = 0
+        for r in range(4):
+            for c in range(4):
+
+                Latents_spaital[s] =  modelF(patches[:,r,c].squeeze())[0]
+                s += 1
+        Latents_spaital = Latents_spaital.permute(1, 2, 0, 3, 4)
+        Latents_spaital = Latents_spaital.reshape(256, 10, 16, 4, 4)
+        output = torch.nn.functional.avg_pool3d(Latents_spaital, (16,4,4)).squeeze() 
+
+        losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
+
+        # compute gradient and do SGD step
+        optimizerF.zero_grad()
+        losse.backward()
+        optimizerF.step()
+        #schedulerF.step()
+
+        # measure accuracy and record loss
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        top1.update(acc1[0].item(), images.size(0))
+
+        if args.method != 'BSL':
+            # modelB.load_state_dict(toggle_state_dict(modelF.state_dict(), modelB.state_dict()))
+            modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))#, modelB.state_dict()))
+
+        # if args.method in ['FA', 'BP', 'BSL']:
+
+        #     recons = modelB(latents.detach())
+        #     gener = recons
+        #     reference = images
+        #     reference = F.interpolate(reference, size=gener.shape[-1])
+
+        #     lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+        #     # measure correlation and record loss
+        #     pcorr = correlation(gener, reference)
+        #     losses.update(lossd.item(), images.size(0))
+        #     corr.update(pcorr, images.size(0))
+                
+
+        elif args.method.startswith('SL'):
+            # ----- decoder ------------------    
+            modelF.eval()
+            latents,  output = modelF(images)
+            modelF.train()
+
+            # switch to train mode
+            modelB.train()
+            recons = modelB(latents.detach()) 
+
+            if args.method == 'SLVanilla':
+                gener = recons
+                reference = images
+
+            elif args.method == 'SLTemplateGenerator':
+                repb = onehot.detach()#modelB(onehot.detach())            
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                                              
+                targetproj = modelB(repb) #, switches
+
+                inputs_avgcat = torch.zeros_like(images)
+                for t in torch.unique(target):
+                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
+            
+                gener = targetproj
+                reference = inputs_avgcat
+
+            
+            
+            elif args.method == 'SLError':
+                #TODO: check the norm of subtracts
+                prob = nn.Softmax(dim=1)(output.detach())
+                repb = onehot - prob
+
+                repb = torch.norm(output)*repb/torch.norm(repb)
+
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                gener = modelB(repb.detach())
+                reference = images - F.interpolate(recons, size=images.shape[-1])
+
+            elif args.method == 'SLRobust':
+                
+                prob = nn.Softmax(dim=1)(output.detach())
+                repb = onehot - prob
+
+                repb = torch.norm(output)*repb/torch.norm(repb)
+
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                gener = modelB(repb.detach())
+                reference = images 
+
+            elif args.method == 'SLErrorTemplateGenerator':
+                prob = nn.Softmax(dim=1)(output.detach())
+                repb = onehot - prob#modelB(onehot.detach())       
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)                   
+                targetproj = modelB(repb) #, switches
+
+                inputs_avgcat = torch.zeros_like(images)
+                for t in torch.unique(target):
+                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
+            
+                gener = targetproj
+                reference = inputs_avgcat
+            
+            reference = F.interpolate(reference, size=gener.shape[-1])
+
+            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+
+            # measure correlation and record loss
+            pcorr = correlation(gener, reference)
+            losses.update(lossd.item(), images.size(0))
+            corr.update(pcorr, images.size(0))
+                
+            # compute gradient and do SGD step
+            optimizerB.zero_grad()
+            lossd.backward()
+            optimizerB.step()
+            #schedulerB.step()
+
+            # for resnets:
+            # modelF.load_state_dict(toggle_state_dict(modelB.state_dict(), modelF.state_dict()))
+            modelF.load_state_dict(toggle_state_dict(modelB.state_dict()))#, modelF.state_dict()))
+
+        #TODO: train recons error for BP and FA
+
+            
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+
+        if i % args.print_freq == 0:
+            progress.display(i)
+
+    print(args.method + ': Train avg  * lossd {losses.avg:.3f}'
+    .format(losses=losses), flush=True)
+
+    print(args.method + ': Train avg   * Acc@1 {top1.avg:.3f}'
+        .format(top1=top1), flush=True)
+    
+    writer.add_scalar('Train%s/acc1'%args.method, top1.avg , epoch)
+    writer.add_scalar('Train%s/corr'%args.method, corr.avg, epoch)
+    writer.add_scalar('Train%s/loss'%args.method, losses.avg, epoch)
+   
+    return modelF, modelB,[top1.avg, corr.avg, losses.avg]
+
 
 
 

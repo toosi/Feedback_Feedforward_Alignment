@@ -40,6 +40,21 @@ class VanillaBackprop():
         # [0] to get rid of the first channel (1,3,224,224)
         gradients_as_arr = self.gradients
         return gradients_as_arr
+
+
+# A simple hook class that returns the input and output of a layer during forward/backward pass
+class Hook():
+    def __init__(self, module, backward=False):
+        if backward==False:
+            self.hook = module.register_forward_hook(self.hook_fn)
+        else:
+            self.hook = module.register_backward_hook(self.hook_fn)
+    def hook_fn(self, module, input, output):
+        self.input = input
+        self.output = output
+    def close(self):
+        self.hook.remove()
+        
     
 import os, fnmatch
 def find(pattern, path):
@@ -81,6 +96,8 @@ def generate_sample_images(images, target, title, param_dict, args):
     plt.clf()
 
 
+import torchvision
+import torch
 def load_dataset(data_path):
 
     """
@@ -98,3 +115,105 @@ def load_dataset(data_path):
         shuffle=True
     )
     return train_loader
+
+def correlation(output, images):
+    """Computes the correlation between reconstruction and the original images"""
+    x = output.contiguous().view(-1)
+    y = images.contiguous().view(-1) 
+
+    vx = x - torch.mean(x)
+    vy = y - torch.mean(y)
+
+    pearson_corr = torch.sum(vx * vy) / (torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2)))
+    return pearson_corr.item()
+
+
+
+def plot_RDMs(tensor, n_samples, title, args):
+
+    implot = np.zeros((tensor.shape[0], tensor.shape[0]))
+    for i in range(tensor.shape[0]):
+        for j in range(tensor.shape[0]):
+            implot[i,j]= correlation(tensor[i],tensor[j])
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=[6,5])
+
+    title_font = 13
+    axis_font = 11
+
+    im = ax.matshow(implot, vmin=0, vmax=1, origin='lower', cmap=plt.cm.get_cmap('Spectral_r'))
+    # ax.axis('off')
+    ax.set_xticks(np.linspace(args.n_samples_RDM/2,args.n_classes*args.n_samples_RDM-args.n_samples_RDM/2,args.n_classes))
+    ax.set_xticklabels(range(args.n_classes), fontsize=axis_font)
+
+    ax.set_yticks(np.linspace(args.n_samples_RDM/2,args.n_classes*args.n_samples_RDM-args.n_samples_RDM/2,args.n_classes))
+    ax.set_yticklabels(range(args.n_classes), fontsize=axis_font)
+    ax.set_ylim(ax.get_ylim()[::-1])
+
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.02, 0.7])
+        
+    fig.colorbar(im, cax=cbar_ax)
+    # axes.set_title('C=%s'%target[im].item())
+    fig.suptitle(args.runname + ' method=%s, %s'%(args.method, title), fontsize=title_font)
+    fig.savefig(args.resultsdir+'RDMs%s_eval%s_%s.png'%(title, args.eval_time, args.method), dpi=200)
+    fig.savefig(args.resultsdir+'RDMs%s_eval%s_%s.pdf'%(title, args.eval_time, args.method), dpi=200)
+    print('RDM %s_eval%s_%s.png saved at %s'%(title, args.eval_time, args.method, args.resultsdir))
+    plt.clf()
+
+    return implot
+
+
+# def zscore(tensor):
+
+#     mean = tensor.mean(dim=0, keepdim=True)
+#     print(mean.shape, mean)
+#     std = tensor.mean(dim=0, keepdim=True)
+
+#     mean = mean.repeat(100,1)
+#     std = std.repeat(100,1)
+    
+#     tensor = (tensor - mean)/std
+#     print(tensor)
+#     return tensor
+
+def generate_spectrum(tensor1,title1,tensor2, title2, args):
+
+    array1 = tensor1.view(tensor1.shape[0], -1).cpu().numpy()
+    array2 = tensor2.view(tensor2.shape[0], -1).cpu().numpy()
+    from sklearn.decomposition import PCA
+
+    n_components = 1000
+
+    pca = PCA(n_components=n_components)
+
+    def get_ev_ratios(array):
+        pca.fit(array)
+        ev_ratios = pca.explained_variance_ratio_
+        return ev_ratios
+
+    ev_ratios1 = get_ev_ratios(array1)
+    ev_ratios2 = get_ev_ratios(array2)
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=[6,5])
+    ax.loglog(range(n_components), ev_ratios1,color='b', label=title1)
+    ax.loglog(range(n_components), ev_ratios2,color='r', label=title2)
+    ax.loglog(np.arange(1,n_components), [1/i for i in np.arange(1, n_components)], label='1/f')
+    ax.set_xlabel('PC dimensions')
+    ax.set_ylabel('explained variance ratio')
+    ax.legend()
+
+    from scipy.optimize import curve_fit
+    def f_linear(x, a, b):
+        return a*x+b
+
+    a, b = curve_fit(f_linear, np.log(np.arange(1, n_components)), np.log(ev_ratios1[1:]))[0]
+    print(a, 'a')
+    ax.loglog(range(n_components), np.array([a*i+b for i in range(n_components)]), ls='--', color='b')
+    ax.text(1,10e-9,'%s a=%0.2f'%(title1,a))
+
+    a, b = curve_fit(f_linear, np.log(np.arange(1, n_components)), np.log(ev_ratios2[1:]))[0]
+    print(a, 'a')
+    ax.text(1,10e-10,'%s a=%0.2f'%(title2,a))
+    ax.loglog(range(n_components), np.array([a*i+b for i in range(n_components)]), ls='--', color='r')
+    ax.set_title(args.runname + ' method=%s, n_comp=%d'%(args.method, n_components), fontsize=13)
+    fig.savefig(args.resultsdir+'eigen_spectrum%sand%s_eval%s_%s_n%d.png'%(title1,title2, args.eval_time, args.method, n_components), dpi=200)
