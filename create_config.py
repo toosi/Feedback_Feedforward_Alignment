@@ -62,7 +62,8 @@ parser.add_argument('-ad', '--archd', metavar='ARCHD', default='ConvGene',
                         ' | '.join(model_names) +
                         ' (default: resnet18)')
 
-
+parser.add_argument('-AdvTraining', default=False, type=bool, metavar='N',
+                    help='if True it does FGSM advresarial training for each batch')
 rundatetime = datetime.now().strftime('%b%d-%H-%M')
 import git
 repo = git.Repo(search_parent_directories=True)

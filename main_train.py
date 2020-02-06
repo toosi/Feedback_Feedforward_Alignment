@@ -872,8 +872,29 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             modelF.load_state_dict(toggle_state_dict(modelB.state_dict()))#, modelF.state_dict()))
 
         #TODO: train recons error for BP and FA
+        if args.AdvTraining:
+            images.requires_grad = True
+            _, output = modelF(images)
+            losse = criterione(output, target)
+            modelF.zero_grad()
+            losse.backward()
+            images_grad = images.grad.data
 
-            
+            train_epsilon=0.1
+            perturbed_images = fgsm_attack(images, train_epsilon, images_grad)
+            latents, output = modelF(perturbed_images)
+            modelF.zero_grad()
+            losse = criterione(output, target)
+            optimizerF.zero_grad()
+            losse.backward()
+            optimizerF.step()
+
+            images.requires_grad = False
+            _, output = modelF(images)
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            top1.update(acc1[0].item(), images.size(0))
+
+
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
@@ -1124,6 +1145,18 @@ def accuracy(output, target, topk=(1,)):
             correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
+
+# FGSM attack code from pytorch tutorial
+def fgsm_attack(image, epsilon, data_grad):
+    # Collect the element-wise sign of the data gradient
+    sign_data_grad = data_grad.sign()
+    # Create the perturbed image by adjusting each pixel of the input image
+    perturbed_image = image + epsilon*sign_data_grad
+    # Adding clipping to maintain [0,1] range
+    perturbed_image = torch.clamp(perturbed_image, 0, 1)
+    # Return the perturbed image
+    return perturbed_image
+
 
 def correlation(output, images):
     """Computes the correlation between reconstruction and the original images"""
