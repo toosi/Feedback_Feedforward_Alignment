@@ -325,10 +325,15 @@ def main_worker(gpu, ngpus_per_node, args):
 
             optimizerF = getattr(torch.optim,args.optimizerF)(list(modelF.parameters()), args.lrF,
                         weight_decay=args.wdF)
+            optimizerF3 = getattr(torch.optim,args.optimizerF)(list(modelF.parameters()), args.lrF,
+                        weight_decay=args.wdF)
         else:
             optimizerF = getattr(torch.optim,args.optimizerF)(list(modelF.parameters()), args.lrF,
                                     momentum=args.momentum,
                                     weight_decay=args.wdF)
+            optimizerF3 = getattr(torch.optim,args.optimizerF)(list(modelF.parameters()), args.lrF,
+                        momentum=args.momentum,
+                        weight_decay=args.wdF)
 
         if 'Adam' in args.optimizerB:                       
 
@@ -343,6 +348,8 @@ def main_worker(gpu, ngpus_per_node, args):
     schedulerF = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerF, 'max', patience=args.patiencee, factor=args.factore)
     schedulerB = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerB, 'max', patience=args.patienced, factor=args.factord)
 
+    schedulerF3 = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerF3, 'max', patience=args.patiencee, factor=args.factore)
+
     
     modelF_nottrained = torch.load(args.resultsdir+'model%s_untrained.pt'%modelidentifier)
     modelB_nottrained = torch.load(args.resultsdir+'modelB_untrained.pt')
@@ -353,12 +360,15 @@ def main_worker(gpu, ngpus_per_node, args):
     schedulerF_original = torch.load(args.resultsdir+'scheduler%s_original.pt'%modelidentifier)
     schedulerB_original = torch.load(args.resultsdir+'schedulerB_original.pt')
 
+    schedulerF3_original = torch.load(args.resultsdir+'scheduler%s_original.pt'%modelidentifier)
+
         
     modelF.load_state_dict(modelF_nottrained)
     modelB.load_state_dict(modelB_nottrained)
 
     optimizerF.load_state_dict(optimizerF_original)
     optimizerB.load_state_dict(optimizerB_original)
+    optimizerF3.load_state_dict(optimizerF_original)
 
     schedulerF.load_state_dict(schedulerF_original)
     schedulerB.load_state_dict(schedulerB_original)
@@ -556,7 +566,7 @@ def main_worker(gpu, ngpus_per_node, args):
         print('*****  lrF=%1e'%(lrF))
         
         # train for one epoch
-        modelF, modelB, train_results = train(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB, schedulerF,schedulerB, epoch, args)
+        modelF, modelB, train_results = train(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB,optimizerF3, schedulerF,schedulerB,schedulerF3, epoch, args)
         Train_acce_list.extend( [round(train_results[0],3)])
         Train_corrd_list.extend([round(train_results[1],3)])
         Train_lossd_list.extend([train_results[2]])
@@ -645,7 +655,7 @@ def main_worker(gpu, ngpus_per_node, args):
             print('*****  lrF=%1e'%(lrF))
             
             # train for one epoch
-            modelF, modelB, train_results = train(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB, schedulerF,schedulerB, epoch, args)
+            modelF, modelB, train_results = train(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB,optimizerF3, schedulerF,schedulerB,schedulerF3, epoch, args)
             Train_acce_list.extend( [round(train_results[0],3)])
             Train_corrd_list.extend([round(train_results[1],3)])
             Train_lossd_list.extend([train_results[2]])
@@ -707,7 +717,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
         
-def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, optimizerB,schedulerF,schedulerB, epoch, args):
+def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, optimizerB,optimizerF3,schedulerF,schedulerB,schedulerF3, epoch, args):
 
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
@@ -872,6 +882,17 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             modelF.load_state_dict(toggle_state_dict(modelB.state_dict()))#, modelF.state_dict()))
 
         #TODO: train recons error for BP and FA
+
+        if hasattr(args, 'CycleConsis'):
+            if args.CycleConsis:
+
+                latents_gener, output_gener = modelF(F.interpolate(gener, size=images.shape[-1]).detach())
+                lossCC = criteriond(latents_gener, latents.detach())
+                optimizerF3.zero_grad()
+                lossCC.backward()
+                optimizerF3.step()
+
+
         if args.AdvTraining:
             images.requires_grad = True
             _, output = modelF(images)
@@ -880,19 +901,21 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             losse.backward()
             images_grad = images.grad.data
 
-            train_epsilon=0.1
+            train_epsilon=0.5
             perturbed_images = fgsm_attack(images, train_epsilon, images_grad)
             latents, output = modelF(perturbed_images)
             modelF.zero_grad()
             losse = criterione(output, target)
-            optimizerF.zero_grad()
+            optimizerF3.zero_grad()
             losse.backward()
-            optimizerF.step()
+            optimizerF3.step()
 
             images.requires_grad = False
-            _, output = modelF(images)
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            top1.update(acc1[0].item(), images.size(0))
+
+        # compute the accuracy after all training magics    
+        _, output = modelF(images)
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        top1.update(acc1[0].item(), images.size(0))
 
 
         # measure elapsed time

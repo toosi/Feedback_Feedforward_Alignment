@@ -1,9 +1,9 @@
 #!/bin/sh
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
-#SBATCH -c 40
-#SBATCH --gres=gpu:gtx2080:4
-#SBATCH --mem=80gb
+#SBATCH -c 20
+#SBATCH --gres=gpu:2
+#SBATCH --mem=40gb
 #SBATCH 
 
 
@@ -12,8 +12,8 @@ module load anaconda3-2019.03
 source activate /home/tt2684/conda-envs/pytorch_tensorflow_SYNPAI_CUDA100cudnn75
 
 now=$(date +'%Y-%m-%d_%H-%M')
-note='**Adversarial_Training_as_the_third_step_in_SL**'
-# learning_scheduler_of_decoder_depends_on_its_own_cost
+note='**Cycle_Consistency_withscheduler_as_the_third_step_in_SL_and_in_Controls**'
+# Cycle_Consistency AdvTrainingFGSM_epsilon0.5
 printf "********************************************************** \n"
 
 printf " $note \n"
@@ -24,15 +24,15 @@ printf "********************************************************** \n"
 config=0
 # python -u create_config.py -dataset imagenet  -j 24 --input_size 224 --base_channels 128 --batch-size 128 --epoch 500 -ae AsymResLNetLimited14F -ad AsymResLNet14B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 # python -u create_config.py -dataset CIFAR10 -AdvTraining True -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 500 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
-# python -u create_config.py -dataset MNIST -AdvTraining True -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py -dataset MNIST -CycleConsis True -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
 if [ $config == 0 ]
     then
-    runname='Feb06-16-19_95439be6e1_105' #'Jan28-12-36_a4e68fe8a6_916'  #'Jan19-09-23_70f10333a4_657'  #'Jan17-15-32_40a474bced_872'  # 'Jan15-11-58_fc540af17a_346'  #'Jan15-11-38_fc540af17a_617'  #'Jan15-11-58_fc540af17a_346'  #   #'Dec30-16-38_04f1282767_1'   #'Dec29-10-13_fd73bdce0b_2'  #Dec06-23-07_81c6b0578b_2' #'Dec06-12-23_81c6b0578b_2'   #'Dec06-09-41_81c6b0578b_2' #'Dec06-12-09_81c6b0578b_2'
+    runname='Feb06-16-19_95439be6e1_105'  #'Feb06-16-19_95439be6e1_105' #'Feb07-09-58_d0c9615475_480'  #
     configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
 
     # python -u main_train.py --method BSL  --config-file $configpath
-    python -u main_train.py --method SLVanilla  --config-file $configpath
+    # python -u main_train.py --method SLVanilla  --config-file $configpath
     # python -u main_train.py --method FA --config-file $configpath
     # python -u main_train.py --method BP  --config-file $configpath
     # python -u main_train.py --method SLDecoderRobustOutput  --config-file $configpath
@@ -46,7 +46,7 @@ if [ $config == 0 ]
     # python -u main_train_SLtarget.py --method SLVanilla  --config-file $configpath
 
 
-    # python -u generate_figures.py --config-file $configpath
+    python -u generate_figures.py --config-file $configpath
     # python -u generate_figures.py --config-file $configpath --eval_RDMs True
     # # remember to run on 1 gpu to make sure hooks work as expected
     # methods='SLVanilla BP FA' # SLRobust SLError

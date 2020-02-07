@@ -252,7 +252,7 @@ else:
     axes[1].set_xticks([])
     axes[1].set_yticks([])
     axes[1].axis('off')
-    txt= axes[1].text(-0.1,-0.1,str(args),wrap=True, fontsize=8 )
+    txt= axes[1].text(-0.1,-0.1,str(args),wrap=True, fontsize=7 )
     txt._get_wrap_line_width = lambda : 200
 
 
