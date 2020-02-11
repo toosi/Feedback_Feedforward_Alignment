@@ -1,10 +1,10 @@
 """
 modified resnet architecture
 no fc
-no bn with tapering, track_running=false
+no bn with tapering,no bn after down/upsample (down/upsample is not Sequiential),  track_running=false
 maxpool??
-addec conv2 at the end: number of output channels=num_classes
-
+addec conv2 at the end: number of output channels=n_classes
+inplace=False for ReLUs
 needs state_dict_utils.toggle_state_dict_resnets to toggle the weights in SL
 """
 
@@ -74,7 +74,7 @@ class BasicBlock(nn.Module):
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(inplanes, planes, stride, algorithm=algorithm)
         # self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.conv2 = conv3x3(planes, planes, algorithm=algorithm)
         self.bn2 = norm_layer(planes, track_running_stats=False)
         self.downsample = downsample
@@ -116,7 +116,7 @@ class Bottleneck(nn.Module):
         self.bn2 = norm_layer(width)
         self.conv3 = conv1x1(width, planes * self.expansion, algorithm=algorithm)
         self.bn3 = norm_layer(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.downsample = downsample
         self.stride = stride
 
@@ -145,7 +145,7 @@ class Bottleneck(nn.Module):
 
 class AsymResNet(nn.Module):
 
-    def __init__(self, block, layers, num_classes=10, zero_init_asymresidual=False,
+    def __init__(self, block, layers, n_classes=10,image_channels=3,base_channels=64, zero_init_asymresidual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
                  norm_layer=None, algorithm='BP'):
         super(AsymResNet, self).__init__()
@@ -167,7 +167,7 @@ class AsymResNet(nn.Module):
         self.conv1 = Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1,
                                bias=False, algorithm=algorithm)
         self.bn1 = norm_layer(self.inplanes, track_running_stats=False)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0], algorithm=algorithm)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
@@ -176,10 +176,10 @@ class AsymResNet(nn.Module):
                                        dilate=replace_stride_with_dilation[1], algorithm=algorithm)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2], algorithm=algorithm)
-        self.conv2 = Conv2d(512, num_classes, kernel_size=3, stride=1, padding=1,
+        self.conv2 = Conv2d(512, n_classes, kernel_size=3, stride=1, padding=1,
                                bias=False, algorithm=algorithm)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        # self.fc = Linear(512 * block.expansion, num_classes, algorithm=algorithm)
+        # self.fc = Linear(512 * block.expansion, n_classes, algorithm=algorithm)
 
         for m in self.modules():
             if isinstance(m, Conv2d):
@@ -206,10 +206,9 @@ class AsymResNet(nn.Module):
             self.dilation *= stride
             stride = 1
         if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                conv1x1(self.inplanes, planes * block.expansion, stride, algorithm=algorithm),
+            downsample = conv1x1(self.inplanes, planes * block.expansion, stride, algorithm=algorithm)
                 # norm_layer(planes * block.expansion, track_running_stats=False),
-            )
+            
 
         layers = []
         layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
@@ -239,7 +238,7 @@ class AsymResNet(nn.Module):
         # x = torch.flatten(x, 1)
         # x = self.fc(x)
 
-        return latent, x
+        return latent, x.squeeze()
 
     def forward(self, x):
         return self._forward_impl(x)
@@ -399,7 +398,7 @@ class BasicBlockT(nn.Module):
         # Both self.conv1 and self.upsample layers upsample the input when stride != 1
         self.conv1 = convT3x3(planes, inplanes,  stride, algorithm=algorithm)
         # self.bn1 = norm_layer(inplanes, track_running_stats=False)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.conv2 = convT3x3(planes, planes, algorithm=algorithm)
         self.bn2 = norm_layer(planes, track_running_stats=False)
         self.upsample = upsample
@@ -441,7 +440,7 @@ class BottleneckT(nn.Module):
         self.bn2 = norm_layer(width, track_running_stats=False)
         self.conv3 = convT1x1(width, planes * self.expansion, algorithm=algorithm)
         self.bn3 = norm_layer(planes * self.expansion, track_running_stats=False)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.upsample = upsample
         self.stride = stride
 
@@ -470,7 +469,7 @@ class BottleneckT(nn.Module):
 
 class AsymResNetT(nn.Module):
 
-    def __init__(self, block, layers, num_classes=10, zero_init_asymresidual=False,
+    def __init__(self, block, layers, n_classes=10, image_channels=3, base_channels=64, zero_init_asymresidual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
                  norm_layer=None, algorithm='BP'):
         super(AsymResNetT, self).__init__()
@@ -490,7 +489,7 @@ class AsymResNetT(nn.Module):
         self.groups = groups
         self.base_width = width_per_group
 
-        self.conv2 = ConvTranspose2d(num_classes, 512, kernel_size=3, stride=1, padding=1,
+        self.conv2 = ConvTranspose2d(n_classes, 512, kernel_size=3, stride=1, padding=1,
                                bias=False, algorithm=algorithm)
         self.layer4 = self._make_layer(block, 256, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2], algorithm=algorithm)
@@ -499,7 +498,7 @@ class AsymResNetT(nn.Module):
         self.layer2 = self._make_layer(block, 64, layers[1], stride=2,
                                        dilate=replace_stride_with_dilation[0], algorithm=algorithm)
         self.layer1 = self._make_layer(block, 64, layers[0], algorithm=algorithm)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.bn1 = norm_layer(self.inplanes, track_running_stats=False)
         self.conv1 = ConvTranspose2d(self.inplanes, 3, kernel_size=3, stride=1, padding=1,
                                bias=False, algorithm=algorithm)
@@ -507,7 +506,7 @@ class AsymResNetT(nn.Module):
 
         #self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         # self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        # self.fc = Linear(512 * block.expansion, num_classes, algorithm=algorithm)
+        # self.fc = Linear(512 * block.expansion, n_classes, algorithm=algorithm)
 
         for m in self.modules():
             if isinstance(m, ConvTranspose2d):
@@ -541,10 +540,9 @@ class AsymResNetT(nn.Module):
         
 
         if stride != 1 or self.inplanes != int(planes / block.expansion):
-            upsample = nn.Sequential(
-                convT1x1(self.inplanes, int(planes / block.expansion), stride, algorithm=algorithm),
+            upsample = convT1x1(self.inplanes, int(planes / block.expansion), stride, algorithm=algorithm)
                 # norm_layer(int(planes / block.expansion)),
-            )
+            
 
 
         

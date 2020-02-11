@@ -47,14 +47,12 @@ from utils import state_dict_utils
 import pytorch_ssim
 
 
-toggle_state_dict = state_dict_utils.toggle_state_dict
-# toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
-toggle_state_dict_YYtoBP = state_dict_utils.toggle_state_dict_YYtoBP
+# # toggle_state_dict = state_dict_utils.toggle_state_dict # for ResNetLraveled
+# toggle_state_dict = state_dict_utils.toggle_state_dict_resnets # for custom_resnets
+# toggle_state_dict_YYtoBP = state_dict_utils.toggle_state_dict_YYtoBP
 
-from models import custom_models_ResNetLraveled as custom_models
-
-# from models import custom_models as custom_models
-# from models import custom_models_Fixup as custom_models
+# # from models import custom_models_ResNetLraveled as custom_models
+# from models import custom_resnets as custom_models
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -96,6 +94,21 @@ with open(args.resultsdir+'args.yml', 'w') as outfile:
 
 writer = SummaryWriter(log_dir=args.tensorboarddir)
 
+
+if 'AsymResLNet' in args.arche:
+    toggle_state_dict = state_dict_utils.toggle_state_dict
+    from models import custom_models_ResNetLraveled as custom_models
+
+elif 'asymresnet' in args.arche:
+    toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
+    from models import custom_resnets as custom_models
+
+elif args.arche.startswith('resnet'):
+    from models import resnets as custom_models
+    #just for compatibality
+    toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
+
+toggle_state_dict_YYtoBP = state_dict_utils.toggle_state_dict_YYtoBP
 
 # project = 'SYY2020' #'SYY-MINST'
 # # ---------- path to save data and models
@@ -360,7 +373,6 @@ def main_worker(gpu, ngpus_per_node, args):
     schedulerF_original = torch.load(args.resultsdir+'scheduler%s_original.pt'%modelidentifier)
     schedulerB_original = torch.load(args.resultsdir+'schedulerB_original.pt')
 
-    schedulerF3_original = torch.load(args.resultsdir+'scheduler%s_original.pt'%modelidentifier)
 
         
     modelF.load_state_dict(modelF_nottrained)
@@ -373,7 +385,7 @@ def main_worker(gpu, ngpus_per_node, args):
     schedulerF.load_state_dict(schedulerF_original)
     schedulerB.load_state_dict(schedulerB_original)
 
-    
+    schedulerF3.load_state_dict(schedulerF_original)
     
     # Data loading code
     if args.dataset == 'imagenet':
@@ -590,6 +602,7 @@ def main_worker(gpu, ngpus_per_node, args):
         adjust_learning_rate(schedulerF, acce)
         adjust_learning_rate(schedulerB, acce)# corrd
 
+        # adjust_learning_rate(schedulerF3, acce)
 
         # remember best acc@1 and save checkpoint
         is_beste = acce > best_acce
@@ -637,7 +650,12 @@ def main_worker(gpu, ngpus_per_node, args):
 
         lrF_list = []
 
-        modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))
+
+        if 'AsymResLNet' in args.arche:
+            modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))
+        elif 'asymresnet' in args.arche:
+            modelB.load_state_dict(modelF.state_dict(), toggle_state_dict(modelB.state_dict()))
+        
 
         for epoch in range(args.start_epoch, args.epochs):
 
@@ -780,11 +798,18 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
         top1.update(acc1[0].item(), images.size(0))
 
-        if args.method != 'BSL':
+        if args.method not in ['BSL']:
             # modelB.load_state_dict(toggle_state_dict(modelF.state_dict(), modelB.state_dict()))
-            modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))#, modelB.state_dict()))
+            if 'AsymResLNet' in args.arche:
+                modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))
+            elif 'asymresnet' in args.arche:
+                modelB.load_state_dict(toggle_state_dict(modelF.state_dict(),modelB.state_dict()))
 
-        if args.method in ['FA', 'BP', 'BSL']:
+        
+
+
+
+        if args.method in ['FA','BP',  'BSL']:#,
 
             recons = modelB(latents.detach())
             gener = recons
@@ -848,6 +873,20 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                 gener = modelB(repb.detach())
                 reference = images 
+            
+            elif args.method == 'SLGAN':
+                
+                prob = nn.Softmax(dim=1)(output.detach())
+                repb = onehot - prob
+
+                repb = torch.norm(output)*repb/torch.norm(repb)
+
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                gener = modelB(repb.detach())
+                reference = images 
+
+                gener = F.interpolate(gener, size=reference.shape[-1])
+                _,output_gener = modelF(gener.detach())
 
             elif args.method == 'SLErrorTemplateGenerator':
                 prob = nn.Softmax(dim=1)(output.detach())
@@ -864,7 +903,11 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             
             reference = F.interpolate(reference, size=gener.shape[-1])
 
-            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+            if args.method == 'SLGAN':
+                
+                lossd = - criterione(output_gener, target) #criteriond(gener, reference) 
+            else:
+                lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
 
             # measure correlation and record loss
             pcorr = correlation(gener, reference)
@@ -879,21 +922,27 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
 
             # for resnets:
             # modelF.load_state_dict(toggle_state_dict(modelB.state_dict(), modelF.state_dict()))
-            modelF.load_state_dict(toggle_state_dict(modelB.state_dict()))#, modelF.state_dict()))
+            # modelF.load_state_dict(toggle_state_dict(modelB.state_dict()))#, modelF.state_dict()))
+            if 'AsymResLNet' in args.arche:
+                modelF.load_state_dict(toggle_state_dict(modelB.state_dict()))
+            elif 'asymresnet' in args.arche:
+                modelF.load_state_dict(toggle_state_dict(modelB.state_dict(),modelF.state_dict()))
 
         #TODO: train recons error for BP and FA
 
-        if hasattr(args, 'CycleConsis'):
-            if args.CycleConsis:
+        if hasattr(args, 'cycleConsis'):
+            if args.cycleConsis:
 
                 latents_gener, output_gener = modelF(F.interpolate(gener, size=images.shape[-1]).detach())
                 lossCC = criteriond(latents_gener, latents.detach())
-                optimizerF3.zero_grad()
+                # optimizerF3.zero_grad()
+                optimizerF.zero_grad()
                 lossCC.backward()
-                optimizerF3.step()
+                # optimizerF3.step()
+                optimizerF.step()
 
 
-        if args.AdvTraining:
+        if args.advTraining:
             images.requires_grad = True
             _, output = modelF(images)
             losse = criterione(output, target)
@@ -901,21 +950,23 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             losse.backward()
             images_grad = images.grad.data
 
-            train_epsilon=0.5
+            train_epsilon=0.2
             perturbed_images = fgsm_attack(images, train_epsilon, images_grad)
             latents, output = modelF(perturbed_images)
             modelF.zero_grad()
             losse = criterione(output, target)
-            optimizerF3.zero_grad()
+            # optimizerF3.zero_grad()
+            optimizerF.zero_grad()
             losse.backward()
-            optimizerF3.step()
+            # optimizerF3.step()
+            optimizerF.step()
 
             images.requires_grad = False
 
-        # compute the accuracy after all training magics    
-        _, output = modelF(images)
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        top1.update(acc1[0].item(), images.size(0))
+        # # compute the accuracy after all training magics    
+        # _, output = modelF(images)
+        # acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        # top1.update(acc1[0].item(), images.size(0))
 
 
         # measure elapsed time

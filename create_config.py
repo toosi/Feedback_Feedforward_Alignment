@@ -24,14 +24,8 @@ import matplotlib.pylab as plt
 from utils import state_dict_utils
 
 #%%
-toggle_state_dict = state_dict_utils.toggle_state_dict
-# toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
-toggle_state_dict_YYtoBP = state_dict_utils.toggle_state_dict_YYtoBP
 
-from models import custom_models_ResNetLraveled as custom_models
 
-# from models import custom_models as custom_models
-# from models import custom_models_Fixup as custom_models
 
 
 model_names = sorted(name for name in torchmodels.__dict__
@@ -50,24 +44,23 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
 parser.add_argument('-ae', '--arche', metavar='ARCHE', default='ConvDiscr',
                     choices=model_names+['autoencoder','SeeSaw','See','Saw', 'ResNet18F','AsymResNet10F',\
                          'AsymResNet18F','AsymResNet18FNoBN', 'FCDiscrNet',
-                         'AsymResLNet10FNoMaxP', 'fixup_resnet20', 'fixup_resnet14','AsymResLNet10F','AsymResLNet14F','AsymResLNetLimited10F','AsymResLNetLimited14F'],
+                         'AsymResLNet10FNoMaxP', 'fixup_resnet20', 'fixup_resnet14','AsymResLNet10F','AsymResLNet14F','AsymResLNetLimited10F','AsymResLNetLimited14F','asymresnet18','resnet18c'],
                     help='model architecture: ' +
                         ' | '.join(model_names) +
                         ' (default: resnet18)')
 parser.add_argument('-ad', '--archd', metavar='ARCHD', default='ConvGene',
                     choices=model_names+['autoencoder','SeeSaw','See','Saw', 'ResNet18B','AsymResNet18B','AsymResNet10B',\
                         'AsymResNet18BUpsamp','AsymResNet18BNoBN', 'FCGeneNet','AsymResLNet10BNoMaxP',
-                        'AsymResNet18BNoMaxPLessReLU', 'fixup_resnetT20','fixup_resnetT14','AsymResLNet10B','AsymResLNet14B'],
+                        'AsymResNet18BNoMaxPLessReLU', 'fixup_resnetT20','fixup_resnetT14','AsymResLNet10B','AsymResLNet14B','asymresnetT18','resnet18c'],
                     help='model architecture: ' +
                         ' | '.join(model_names) +
                         ' (default: resnet18)')
 
-parser.add_argument('-AdvTraining', default=False, type=bool, metavar='N',
+parser.add_argument('-advTraining', default=False, type=bool, metavar='N',
                     help='if True it does FGSM advresarial training for each batch')
 
-parser.add_argument('-CycleConsis', default=False, type=bool, metavar='N',
+parser.add_argument('-cycleconsis', default=False, type=bool, metavar='N',
                     help='if True it does CycleConsis for each batch')
-
 
 rundatetime = datetime.now().strftime('%b%d-%H-%M')
 import git
@@ -161,6 +154,25 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 
 args = parser.parse_args()
 
+if 'AsymResLNet' in args.arche:
+    toggle_state_dict = state_dict_utils.toggle_state_dict
+    from models import custom_models_ResNetLraveled as custom_models
+
+
+elif 'asymresnet' in args.arche:
+    toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
+    from models import custom_resnets as custom_models
+
+elif args.arche.startswith('resnet'):
+    from models import resnets as custom_models
+    #just for compatibality
+    toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
+
+toggle_state_dict_YYtoBP = state_dict_utils.toggle_state_dict_YYtoBP
+
+
+
+
 if args.dataset == 'imagenet':
         args.n_classes = 1000
         input_size = 224
@@ -191,7 +203,7 @@ project = 'Symbio' #'SYY_MINST'
 arch = 'E%sD%s'%(args.arche, args.archd)
 
 args.imagesetdir = path_prefix+'/Data/'
-args.runname = rundatetime+'_%s_'%commit[0:min(len(commit), 10)]+str(hash)
+args.runname = rundatetime+'_%s_%s_'%(args.dataset,commit[0:min(len(commit), 10)])+str(hash)
 args.resultsdir = path_prefix+'/Results/Symbio/Symbio/%s/'%args.runname
 args.tensorboarddir = path_prefix + '/Results/Tensorboard_runs/runs'+'/%s/'%project +args.runname
 args.path_prefix = path_prefix

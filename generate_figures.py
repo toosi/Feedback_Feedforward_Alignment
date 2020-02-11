@@ -49,9 +49,9 @@ if not(hasattr(args, 'databasedir')):
     args.databasedir  = path_prefix+'/Results/database/%s/%s/%s/'%(project,arch,args.dataset)
 
 
-methods = ['BP','FA','SLVanilla' ]#','SLRobust', 'SLError''SLRobust', 'SLError' ,'BSL',  'SLErrorTemplateGenerator' 'SLError', 
+methods = ['BP','FA','SLVanilla','SLGAN' ]#',,'SLRobust', 'SLError''SLRobust', 'SLError' ,'BSL',  'SLErrorTemplateGenerator' 'SLError', 
 colors =  {'BP':'k', 'FA':'grey', 'SLVanilla':'r','SLRobust':'salmon',
-            'SLError':'orange', 'SLErrorTemplateGenerator':'yellow', 'BSL':'b'}
+            'SLError':'orange', 'SLErrorTemplateGenerator':'yellow', 'BSL':'b','SLGAN':'m'}
 
 if args.eval_RDMs:
     RDMs_dict = {}
@@ -246,7 +246,7 @@ else:
 
     axes[0].set_xlabel('epoch')
     axes[0].set_ylabel('Discrimination accuracy: percent correct')
-    axes[0].set_title('%s dataset %s '%(args.dataset, args.runname))
+    axes[0].set_title('%s, %s '%(args.dataset, args.runname))
     axes[0].legend()
 
     axes[1].set_xticks([])
@@ -279,7 +279,7 @@ else:
 
     axes[0].set_xlabel('epoch')
     axes[0].set_ylabel('Reconstruction loss: perpixel')
-    axes[0].set_title('%s dataset %s '%(args.dataset, args.runname))
+    axes[0].set_title('%s, %s '%(args.dataset, args.runname))
     axes[0].legend()
 
     axes[1].set_xticks([])

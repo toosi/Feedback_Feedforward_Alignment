@@ -2,18 +2,26 @@
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
 #SBATCH -c 20
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:4
 #SBATCH --mem=40gb
 #SBATCH 
-
+if [ X"$SLURM_STEP_ID" = "X" -a X"$SLURM_PROCID" = "X"0 ]
+then
+  echo " =========================================="
+  echo " SLURM_JOB_ID = $SLURM_JOB_ID"
+  echo " SLURM_JOB_NODELIST = $SLURM_JOB_NODELIST"
+  echo " =========================================="
+fi
 
 module load anaconda3-2019.03
 
 source activate /home/tt2684/conda-envs/pytorch_tensorflow_SYNPAI_CUDA100cudnn75
 
 now=$(date +'%Y-%m-%d_%H-%M')
-note='**Cycle_Consistency_withscheduler_as_the_third_step_in_SL_and_in_Controls**'
-# Cycle_Consistency AdvTrainingFGSM_epsilon0.5
+note='**SLGAN_Error_without_reconstrucntion**'
+# imagenet_with_modified_resnets_wobn1_trackFalse_wolastAcc
+# Cycle_Consistency AdvTrainingFGSM_epsilon0.2_withOUTSperateOptimizerscheduler
+# AdvTrainingFGSM_epsilon0.2_withscheduler
 printf "********************************************************** \n"
 
 printf " $note \n"
@@ -22,19 +30,20 @@ printf "********************************************************** \n"
 
 ####Command to execute Python program
 config=0
-# python -u create_config.py -dataset imagenet  -j 24 --input_size 224 --base_channels 128 --batch-size 128 --epoch 500 -ae AsymResLNetLimited14F -ad AsymResLNet14B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
-# python -u create_config.py -dataset CIFAR10 -AdvTraining True -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 500 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
-# python -u create_config.py -dataset MNIST -CycleConsis True -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py -dataset imagenet  -j 24 --input_size 224 --base_channels 64 --batch-size 64 --epoch 500 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 10 --patienced 8 -p 100 --note  $note ; config=1  #
+# python -u create_config.py -dataset CIFAR10  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 500 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py -dataset MNIST -cycleconsis True -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
 if [ $config == 0 ]
     then
-    runname='Feb06-16-19_95439be6e1_105'  #'Feb06-16-19_95439be6e1_105' #'Feb07-09-58_d0c9615475_480'  #
+    runname='Feb11-06-08_CIFAR10_99c498e234_892'  #'Feb10-09-04_CIFAR10_99c498e234_23'  #Feb09-13-02_99c498e234_610  'Feb06-16-19_95439be6e1_105' #'Feb07-09-58_d0c9615475_480'  #
     configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
 
     # python -u main_train.py --method BSL  --config-file $configpath
     # python -u main_train.py --method SLVanilla  --config-file $configpath
     # python -u main_train.py --method FA --config-file $configpath
     # python -u main_train.py --method BP  --config-file $configpath
+    # python -u main_train.py --method SLGAN  --config-file $configpath
     # python -u main_train.py --method SLDecoderRobustOutput  --config-file $configpath
     # python -u main_train.py --method SLError  --config-file $configpath
     # python -u main_train.py --method SLDecoderRobustOnehot  --config-file $configpath
