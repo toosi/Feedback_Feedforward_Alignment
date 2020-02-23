@@ -195,11 +195,11 @@ class AsymResLNet10B(nn.Module):
         x = self.relu(x)
         
 
-        x = self.relu(self.bn1(x))
-        x = self.conv1(x)
+        preconv1 = self.relu(self.bn1(x))
+        x = self.conv1(preconv1)
 
 
-        return x
+        return preconv1, x
 
 
 

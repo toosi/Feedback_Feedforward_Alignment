@@ -555,10 +555,12 @@ def main_worker(gpu, ngpus_per_node, args):
     Train_acce_list = []
     Train_corrd_list = []
     Train_lossd_list= []
+    Train_lossl_list= []
 
     Test_acce_list  = []
     Test_corrd_list = []
     Test_lossd_list = []
+    Test_lossl_list= []
 
     lrF_list = []
 
@@ -582,9 +584,11 @@ def main_worker(gpu, ngpus_per_node, args):
         Train_acce_list.extend( [round(train_results[0],3)])
         Train_corrd_list.extend([round(train_results[1],3)])
         Train_lossd_list.extend([train_results[2]])
+        Train_lossl_list.extend([train_results[3]])
         run_json_dict.update({'Train_acce':Train_acce_list})
         run_json_dict.update({'Train_corrd':Train_corrd_list})
         run_json_dict.update({'Train_lossd':Train_lossd_list})
+        run_json_dict.update({'Train_lossl':Train_lossl_list})
         # evaluate on validation set
         _, _, test_results = validate(val_loader, modelF,modelB, criterione, criteriond, args, epoch)
         
@@ -593,9 +597,11 @@ def main_worker(gpu, ngpus_per_node, args):
         Test_acce_list.extend( [round(test_results[0],3)])
         Test_corrd_list.extend([round(test_results[1],3)])
         Test_lossd_list.extend([test_results[2]])
+        Test_lossl_list.extend([test_results[3]])
         run_json_dict.update({'Test_acce':Test_acce_list})
         run_json_dict.update({'Test_corrd':Test_corrd_list})
         run_json_dict.update({'Test_lossd':Test_lossd_list})
+        run_json_dict.update({'Test_lossl':Test_lossl_list})
 
         # ---- adjust learning rates ----------
 
@@ -740,6 +746,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
+    losslatent = AverageMeter('LossL', ':.4e')
     corr = AverageMeter('corr', ':6.2f')
     
     top1 = AverageMeter('Acc@1', ':6.2f')
@@ -805,13 +812,10 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             elif 'asymresnet' in args.arche:
                 modelB.load_state_dict(toggle_state_dict(modelF.state_dict(),modelB.state_dict()))
 
-        
 
+        if any(m in args.method for m in ['FA','BP', 'BSL']):
 
-
-        if args.method in ['FA','BP',  'BSL']:#,
-
-            recons = modelB(latents.detach())
+            _,recons = modelB(latents.detach())
             gener = recons
             reference = images
             reference = F.interpolate(reference, size=gener.shape[-1])
@@ -831,17 +835,17 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
 
             # switch to train mode
             modelB.train()
-            recons = modelB(latents.detach()) 
+            _,recons = modelB(latents.detach()) 
 
-            if args.method == 'SLVanilla':
+            if 'SLVanilla' in args.method:
                 gener = recons
                 reference = images
 
-            elif args.method == 'SLTemplateGenerator':
+            elif 'SLTemplateGenerator' in args.method:
                 repb = onehot.detach()#modelB(onehot.detach())            
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                                               
-                targetproj = modelB(repb) #, switches
+                _,targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -849,10 +853,9 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             
                 gener = targetproj
                 reference = inputs_avgcat
-
+  
             
-            
-            elif args.method == 'SLError':
+            elif 'SLError' in args.method:
                 #TODO: check the norm of subtracts
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob
@@ -863,7 +866,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 gener = modelB(repb.detach())
                 reference = images - F.interpolate(recons, size=images.shape[-1])
 
-            elif args.method == 'SLRobust':
+            elif 'SLRobust' in args.method:
                 
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob
@@ -871,28 +874,14 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 repb = torch.norm(output)*repb/torch.norm(repb)
 
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                gener = modelB(repb.detach())
-                reference = images 
-            
-            elif args.method == 'SLGAN':
-                
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob
-
-                repb = torch.norm(output)*repb/torch.norm(repb)
-
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                gener = modelB(repb.detach())
+                _,gener = modelB(repb.detach())
                 reference = images 
 
-                gener = F.interpolate(gener, size=reference.shape[-1])
-                _,output_gener = modelF(gener.detach())
-
-            elif args.method == 'SLErrorTemplateGenerator':
+            elif 'SLErrorTemplateGenerator' in args.method:
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob#modelB(onehot.detach())       
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)                   
-                targetproj = modelB(repb) #, switches
+                _,targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -901,13 +890,62 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 gener = targetproj
                 reference = inputs_avgcat
             
+            elif 'SLAdvImg' in args.method:
+
+                images.requires_grad = True
+                _, output = modelF(images)
+                losse = criterione(output, target)
+                modelF.zero_grad()
+                losse.backward()
+                images_grad = images.grad.data
+
+                train_epsilon=0.4
+                perturbed_images = fgsm_attack(images, train_epsilon, images_grad)
+                
+                gener = recons
+                reference = perturbed_images
+
+                images.requires_grad = False
+        
+            elif  'SLAdvCost' in args.method:
+
+                prob = nn.Softmax(dim=1)(output.detach())
+                repb = onehot - prob
+
+                repb = torch.norm(output)*repb/torch.norm(repb)
+
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                _,gener = modelB(repb.detach())
+                reference = images 
+
+                _, output_gener = modelF(F.interpolate(gener, size=images.shape[-1]))
+            
+            elif 'SLConv1' in args.method:
+                # requires to be run on a single gpu because of hooks 
+                hookF = Hook(list(modelF.module._modules.items())[0][1])
+                latent, output = modelF(images)
+                conv1 = hookF.output.detach()
+                preconv1, _ = modelB(latent.detach())
+                gener = preconv1
+                reference = conv1
+            
+            elif 'SLLatentRobust' in args.method:
+                sigma2 = 0.2
+
+                latents, _ = modelF(images)
+                delta = torch.empty_like(latents).normal_(mean=0, std=np.sqrt(sigma2)).cuda()
+                _,gener = modelB(latents.detach() + delta)
+                reference = images
+                
+     
+                
+
             reference = F.interpolate(reference, size=gener.shape[-1])
 
-            if args.method == 'SLGAN':
-                
-                lossd = - criterione(output_gener, target) #criteriond(gener, reference) 
+            if  'SLAdvCost' in args.method:
+                lossd = criteriond(gener, reference)-criterione(output_gener,target) #+ criterione(modelF(pooled), target)
             else:
-                lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+                lossd = criteriond(gener, reference)
 
             # measure correlation and record loss
             pcorr = correlation(gener, reference)
@@ -930,38 +968,39 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
 
         #TODO: train recons error for BP and FA
 
-        if hasattr(args, 'cycleConsis'):
-            if args.cycleConsis:
-
-                latents_gener, output_gener = modelF(F.interpolate(gener, size=images.shape[-1]).detach())
-                lossCC = criteriond(latents_gener, latents.detach())
-                # optimizerF3.zero_grad()
-                optimizerF.zero_grad()
-                lossCC.backward()
-                # optimizerF3.step()
-                optimizerF.step()
-
-
-        if args.advTraining:
-            images.requires_grad = True
-            _, output = modelF(images)
-            losse = criterione(output, target)
-            modelF.zero_grad()
-            losse.backward()
-            images_grad = images.grad.data
-
-            train_epsilon=0.2
-            perturbed_images = fgsm_attack(images, train_epsilon, images_grad)
-            latents, output = modelF(perturbed_images)
-            modelF.zero_grad()
-            losse = criterione(output, target)
+        
+        if args.method.endswith('CC0'):
+            latents, _ = modelF(images)
+            _,recons = modelB(latents.detach())
+            latents_gener, output_gener = modelF(F.interpolate(recons, size=images.shape[-1]).detach())
+            lossCC = criteriond(latents_gener, latents.detach())
             # optimizerF3.zero_grad()
             optimizerF.zero_grad()
-            losse.backward()
+            lossCC.backward()
             # optimizerF3.step()
             optimizerF.step()
 
-            images.requires_grad = False
+        elif args.method.endswith('CC1'):
+            sigma2 = 0.2
+            latents, _ = modelF(images)
+            delta = torch.empty_like(latents).normal_(mean=0, std=np.sqrt(sigma2)).cuda()
+            _,gener = modelB(latents.detach() + delta)
+
+            latents_gener, output_gener = modelF(F.interpolate(gener, size=images.shape[-1]).detach())
+            lossCC = criteriond(latents_gener-latents.detach(), delta)
+            # optimizerF3.zero_grad()
+            optimizerF.zero_grad()
+            lossCC.backward()
+            # optimizerF3.step()
+            optimizerF.step()
+
+        latents, _ = modelF(images)
+        _, recons = modelB(latents.detach())
+        latents_gener, output_gener = modelF(F.interpolate(recons, size=images.shape[-1]).detach())
+        lossL = criteriond(latents_gener, latents.detach())
+
+
+        losslatent.update(lossL.item(), images.size(0))
 
         # # compute the accuracy after all training magics    
         # _, output = modelF(images)
@@ -986,7 +1025,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
     writer.add_scalar('Train%s/corr'%args.method, corr.avg, epoch)
     writer.add_scalar('Train%s/loss'%args.method, losses.avg, epoch)
    
-    return modelF, modelB,[top1.avg, corr.avg, losses.avg]
+    return modelF, modelB,[top1.avg, corr.avg, losses.avg, losslatent.avg]
 
 
 
@@ -995,7 +1034,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
     
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
-
+    losslatent = AverageMeter('LossL', ':.4e')
     corr = AverageMeter('corr', ':6.2f')
     top1 = AverageMeter('Acc@1', ':6.2f')
     m1, m2 = top1, corr
@@ -1048,7 +1087,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
             # ----- decoder ------------------ 
 
             latents,  _ = modelF(images)
-            recons = modelB(latents.detach())
+            _,recons = modelB(latents.detach())
 
             if args.method == 'SLTemplateGenerator':
                 repb = onehot.detach()#modelB(onehot.detach())
@@ -1057,7 +1096,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
-                targetproj = modelB(repb) #, switches
+                _,targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -1073,7 +1112,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                gener = modelB(repb.detach())
+                _, gener = modelB(repb.detach())
                 reference = images - F.interpolate(recons, size=images.shape[-1])
 
             elif args.method == 'SLRobust':
@@ -1081,7 +1120,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                gener = modelB(repb.detach())
+                _, gener = modelB(repb.detach())
                 reference = images 
 
             elif args.method == 'SLErrorTemplateGenerator':
@@ -1092,7 +1131,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
-                targetproj = modelB(repb) #, switches
+                _,targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -1109,9 +1148,15 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
 
             lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)       
             
+
+            latents_gener, output_gener = modelF(F.interpolate(recons, size=images.shape[-1]).detach())
+            lossL = criteriond(latents_gener, latents.detach())
+
             pcorr = correlation(gener, reference)
             losses.update(lossd.item(), images.size(0))
             corr.update(pcorr, images.size(0))
+            losslatent.update(lossL.item(), images.size(0))
+
                 
 
             # measure elapsed time
@@ -1135,7 +1180,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
     writer.add_scalar('Test%s/loss'%args.method,losses.avg,epoch)
             
 
-    return modelF, modelB, [top1.avg, corr.avg, losses.avg]
+    return modelF, modelB, [top1.avg, corr.avg, losses.avg, losslatent.avg]
 
 
 def save_checkpoint(state, is_best, filepath=args.path_save_model ,filename='checkpoint.pth.tar'):
@@ -1242,8 +1287,20 @@ def correlation(output, images):
 
     pearson_corr = torch.sum(vx * vy) / (torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2)))
     return pearson_corr.item()
-    
 
+
+# A simple hook class that returns the input and output of a layer during forward/backward pass
+class Hook():
+    def __init__(self, module, backward=False):
+        if backward==False:
+            self.hook = module.register_forward_hook(self.hook_fn)
+        else:
+            self.hook = module.register_backward_hook(self.hook_fn)
+    def hook_fn(self, module, input, output):
+        self.input = input
+        self.output = output
+    def close(self):
+        self.hook.remove()
 
 if __name__ == '__main__':
     main()

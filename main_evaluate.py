@@ -94,6 +94,9 @@ parser.add_argument('--eval_save_sample_images', type=bool, default=False,
                     help='save sample images')
 parser.add_argument('--eval_generate_RDMs', type=bool, default=False, 
                     help='save sample images')
+parser.add_argument('--eval_stimulation', type=bool, default=False, 
+                    help='stimulate onehot')
+                    
 parser.add_argument('--eval_neural', type=str, default='', 
                     help='eval neural mapping not DONE!, e.g. hvmV0')
 
@@ -473,6 +476,21 @@ def main_worker(gpu, ngpus_per_node, args):
     
     assert (args.eval_sigma2==0) or (args.eval_epsilon == 0) or args.eval_generate_RDMs, 'Gaussian noise OR adversarial attack, choose one'
     
+    if args.eval_stimulation:
+
+        _, _, test_results = feedback_stimulation(val_loader, modelF, modelB, criterione, criteriond, args)
+        acce = test_results[0]
+        Test_acce_list.extend( [round(test_results[0],3)])
+        Test_corrd_list.extend([round(test_results[1],3)])
+        Test_lossd_list.extend([test_results[2]])
+        run_json_dict.update({'Test_acce':Test_acce_list})
+        run_json_dict.update({'Test_corrd':Test_corrd_list})
+        run_json_dict.update({'Test_lossd':Test_lossd_list})
+
+        writer.add_scalar('Test%s/acc1'%args.method, test_results[0], itr)
+        writer.add_scalar('Test%s/corr'%args.method, test_results[1], itr)
+        writer.add_scalar('Test%s/loss'%args.method, test_results[2], itr)
+
     if args.eval_generate_RDMs:
 
         _, _, test_results = generate_RDMs(val_loader, modelF, modelB, criterione, criteriond, args)
@@ -599,7 +617,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
             # compute output
             latents, output = modelF(images_noisy)
             # ----- decoder ------------------ 
-            recons_before_interpolation = modelB(latents.detach()) 
+            _,recons_before_interpolation = modelB(latents.detach()) 
             recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
             
             if args.method == 'SLTemplateGenerator':
@@ -607,7 +625,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
-                targetproj = modelB(repb) #, switches
+                _,targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -631,7 +649,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                gener = modelB(repb.detach())
+                _,gener = modelB(repb.detach())
                 reference = images 
 
             elif args.method == 'SLErrorTemplateGenerator':
@@ -642,7 +660,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
-                targetproj = modelB(repb) #, switches
+                _, targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -662,7 +680,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                 latents, output = modelF(gener.detach())
 
                 # ----- decoder ------------------ 
-                recons_before_interpolation = modelB(latents.detach()) 
+                _, recons_before_interpolation = modelB(latents.detach()) 
                 recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
 
                 if args.method == 'SLTemplateGenerator':
@@ -670,7 +688,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                     repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                             
                             
-                    targetproj = modelB(repb) #, switches
+                    _, targetproj = modelB(repb) #, switches
 
                     inputs_avgcat = torch.zeros_like(images)
                     for t in torch.unique(target):
@@ -692,7 +710,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                     prob = nn.Softmax(dim=1)(output.detach())
                     repb = onehot - prob
                     repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                    gener = modelB(repb.detach())
+                    _, gener = modelB(repb.detach())
                     reference = images 
 
                 elif args.method == 'SLErrorTemplateGenerator':
@@ -701,7 +719,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                     
                     
                     repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                    targetproj = modelB(repb) #, switches
+                    _, targetproj = modelB(repb) #, switches
 
                     inputs_avgcat = torch.zeros_like(images)
                     for t in torch.unique(target):
@@ -854,14 +872,14 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
         top1.update(acc1[0].item(), images.size(0))
 
         # ----- decoder ------------------ 
-        recons = modelB(latents.detach())
+        _, recons = modelB(latents.detach())
 
         
         if args.method == 'SLTemplateGenerator':
             repb = onehot.detach()#modelB(onehot.detach())           
             repb = repb.view(args.batch_size, args.n_classes, 1, 1)                   
                     
-            targetproj = modelB(repb) #, switches
+            _, targetproj = modelB(repb) #, switches
 
             inputs_avgcat = torch.zeros_like(images)
             for t in torch.unique(target):
@@ -877,7 +895,7 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
             prob = nn.Softmax(dim=1)(output.detach())
             repb = onehot - prob
             repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-            gener = modelB(repb.detach())
+            _, gener = modelB(repb.detach())
             reference = images - F.interpolate(gener, size=images.shape[-1])
 
         elif args.method == 'SLRobust':
@@ -885,7 +903,7 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
             prob = nn.Softmax(dim=1)(output.detach())
             repb = onehot - prob
             repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-            gener = modelB(repb.detach())
+            _, gener = modelB(repb.detach())
             reference = images 
 
         elif args.method == 'SLErrorTemplateGenerator':
@@ -896,7 +914,7 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
             repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                     
                     
-            targetproj = modelB(repb) #, switches
+            _, targetproj = modelB(repb) #, switches
 
             inputs_avgcat = torch.zeros_like(images)
             for t in torch.unique(target):
@@ -916,14 +934,14 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
             # compute output
             latents, output = modelF(gener.detach())
             # ----- decoder ------------------ 
-            recons = modelB(latents.detach())
+            _, recons = modelB(latents.detach())
 
             if args.method == 'SLTemplateGenerator':
 
                 repb = onehot.detach() #modelB(onehot.detach())    
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                                   
-                targetproj = modelB(repb) #, switches
+                _, targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -939,7 +957,7 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                gener = modelB(repb.detach())
+                _, gener = modelB(repb.detach())
                 reference = images - F.interpolate(recons, size=images.shape[-1])
 
             elif args.method == 'SLRobust':
@@ -947,7 +965,7 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                gener = modelB(repb.detach())
+                _, gener = modelB(repb.detach())
                 reference = images 
 
             elif args.method == 'SLErrorTemplateGenerator':
@@ -957,7 +975,7 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
-                targetproj = modelB(repb) #, switches
+                _, targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -1086,7 +1104,7 @@ def generate_RDMs(val_loader, modelF, modelB, criterione, criteriond, args):
 
 
             # ----- decoder ------------------ 
-            recons_before_interpolation = modelB(latents.detach()) 
+            _, recons_before_interpolation = modelB(latents.detach()) 
             recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
             
             gener = recons
@@ -1095,7 +1113,7 @@ def generate_RDMs(val_loader, modelF, modelB, criterione, criteriond, args):
             # [print(layer[0]) for layer in list(modelB._modules['module']._modules.items())]
             layer = 'conv1'
             HookF = helper_functions.Hook(modelB._modules['module']._modules[layer])
-            recons_before_interpolation = modelB(latents.detach()) 
+            _, recons_before_interpolation = modelB(latents.detach()) 
 
             RDM_conv1_FB = helper_functions.plot_RDMs(tensor=HookF.output, n_samples=args.n_samples_RDM, title='%s-FB'%layer, args=args)
             tensor2 = copy.deepcopy(HookF.output)
@@ -1107,7 +1125,7 @@ def generate_RDMs(val_loader, modelF, modelB, criterione, criteriond, args):
             del HookF
             layer = 'upsample2'
             HookF = helper_functions.Hook(modelB._modules['module']._modules[layer])
-            recons_before_interpolation = modelB(latents.detach()) 
+            _, recons_before_interpolation = modelB(latents.detach()) 
             # print(HookF.input[0].shape, HookF.output.shape)
             RDM_upsample2 = helper_functions.plot_RDMs(tensor=HookF.output, n_samples=args.n_samples_RDM, title='%s-FB'%layer, args=args)
 
@@ -1161,6 +1179,118 @@ def generate_RDMs(val_loader, modelF, modelB, criterione, criteriond, args):
     return modelF, modelB, [top1.avg, corr.avg, losses.avg]
 
 
+def feedback_stimulation(val_loader, modelF, modelB, criterione, criteriond, args):
+    
+    batch_time = AverageMeter('Time', ':6.3f')
+    losses = AverageMeter('Loss', ':.4e')
+
+    corr = AverageMeter('corr', ':6.2f')
+    top1 = AverageMeter('Acc@1', ':6.2f')
+    m1, m2 = top1, corr
+
+    progress = ProgressMeter(
+        len(val_loader),
+        [batch_time, losses, m1, m2],
+        prefix='Test %s: '%args.method)
+
+    if args.gpu is not None:
+        
+        onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda(args.gpu, non_blocking=True)
+    else:
+        onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda()
+
+
+    # switch to evaluate mode
+    modelF.eval()
+    modelB.eval()
+
+    not_saved = True
+    not_saved_itr = True
+
+    with torch.no_grad():
+        end = time.time()
+        for i, (images, target) in enumerate(val_loader):
+
+            
+            if args.gpu is not None:
+                images = images.cuda(args.gpu, non_blocking=True)
+                target = target.cuda(args.gpu, non_blocking=True)
+                one_onehot = torch.zeros(8,8).cuda(args.gpu, non_blocking=True)
+                one_onehot[4,4] = 1
+            else:
+                images = images.cuda()
+                target = target.cuda()
+                one_onehot = torch.zeros(8,8).cuda()
+                one_onehot[4,4] = 1
+            
+            
+            
+            onehot.zero_()
+            onehot.scatter_(1, target.view(target.shape[0], 1), 1)
+            onehot_stim = copy.deepcopy(onehot.unsqueeze(-1).unsqueeze(-1))
+
+            if 'MNIST' in args.dataset  and args.arche[0:2]!='FC':
+                images= images.expand(-1, 1, -1, -1) #images.expand(-1, 3, -1, -1)
+            
+            # ----- encoder ---------------------
+
+            # compute output
+            latents, output = modelF(images)
+            # onehot_stim = onehot_stim.expand(-1,-1, 8, 8)
+
+            # for img in range(2):
+            #     print('Before',onehot_stim[img,target[img],:,:])
+            #     onehot_stim[img,target[img],:,:] = 0
+            #     onehot_stim[img,target[img],4,4] = 1
+            #     print('After',onehot_stim[img,target[img],:,:])
+            _, recons = modelB(latents) #onehot.unsqueeze(-1).unsqueeze(-1)
+
+
+            if not_saved:
+                print(latents.shape, onehot_stim.expand(-1,-1,8,8).shape)
+                print('onehot', onehot[0])
+                # print(target)
+                print('********************')
+                
+                print(onehot_stim[0,target[0]])
+            if (args.eval_save_sample_images) and not_saved:
+                not_saved = False
+                helper_functions.generate_sample_images(recons.detach(), target, title='generated by %s'%args.method, param_dict={'stimulation':'latents'}, args=args)
+
+            
+            
+            
+            # measure accuracy and record loss
+            losse = criterione(output, target) 
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            top1.update(acc1[0].item(), images.size(0))
+
+            # measure correlation and record loss
+            reference = F.interpolate(images, size=recons.shape[-1])
+            lossd = criteriond(recons, reference) #+ criterione(modelF(pooled), target)
+
+            pcorr = correlation(recons, reference)
+            losses.update(lossd.item(), images.size(0))
+            corr.update(pcorr, images.size(0))
+                
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            # if i % args.print_freq == 0:
+            #     progress.display(i)
+
+
+        print('Test avg {method} sigma2 {sigma2} itr: {itr} * lossd {losses.avg:.3f}'
+            .format(method=args.method, sigma2=sigma2, itr=itr,losses=losses), flush=True)
+
+        # TODO: this should also be done with the ProgressMeter
+        print('Test avg  {method} sigma2 {sigma2} itr: {itr} * Acc@1 {top1.avg:.3f}'
+            .format(method=args.method, sigma2=sigma2, itr=itr, top1=top1), flush=True)
+              
+
+    return modelF, modelB, [top1.avg, corr.avg, losses.avg]
+
 
 def validate_neural(val_loader, modelF, modelB, criterione, criteriond, args, itr, layer):
 
@@ -1211,7 +1341,7 @@ def validate_neural(val_loader, modelF, modelB, criterione, criteriond, args, it
             # compute output
             latents, output = modelF(images_noisy)
             # ----- decoder ------------------ 
-            recons_before_interpolation = modelB(latents.detach()) 
+            _, recons_before_interpolation = modelB(latents.detach()) 
             recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
             
             if args.method == 'SLTemplateGenerator':
@@ -1219,7 +1349,7 @@ def validate_neural(val_loader, modelF, modelB, criterione, criteriond, args, it
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
-                targetproj = modelB(repb) #, switches
+                _, targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -1243,7 +1373,7 @@ def validate_neural(val_loader, modelF, modelB, criterione, criteriond, args, it
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                gener = modelB(repb.detach())
+                _, gener = modelB(repb.detach())
                 reference = images 
 
             elif args.method == 'SLErrorTemplateGenerator':
@@ -1254,7 +1384,7 @@ def validate_neural(val_loader, modelF, modelB, criterione, criteriond, args, it
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
-                targetproj = modelB(repb) #, switches
+                _, targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):

@@ -1,5 +1,7 @@
 import argparse
 import numpy as np
+import pandas as pd
+import copy
 import os
 import json
 from utils import helper_functions
@@ -49,9 +51,25 @@ if not(hasattr(args, 'databasedir')):
     args.databasedir  = path_prefix+'/Results/database/%s/%s/%s/'%(project,arch,args.dataset)
 
 
-methods = ['BP','FA','SLVanilla','SLGAN' ]#',,'SLRobust', 'SLError''SLRobust', 'SLError' ,'BSL',  'SLErrorTemplateGenerator' 'SLError', 
-colors =  {'BP':'k', 'FA':'grey', 'SLVanilla':'r','SLRobust':'salmon',
-            'SLError':'orange', 'SLErrorTemplateGenerator':'yellow', 'BSL':'b','SLGAN':'m'}
+
+base_methods = ['BP', 'FA', 'SLVanilla', 'SLError', 'SLAdvImg', 'SLAdvCost','SLConv1', 'SLLatentRobust']
+all_methods = copy.deepcopy(base_methods)
+
+print(base_methods)
+[all_methods.extend([m+'CC0'] )for m in base_methods]
+[all_methods.extend([m+'CC1'] )for m in base_methods]
+print(all_methods)
+colors = {'BP':'k', 'FA':'indigo', 'SLVanilla':'firebrick','SLError':'navy', 'SLAdvImg':'c','SLAdvCost':'darkolivegreen','SLLatentRobust':'yellow',
+               'BPCC0':'dimgrey', 'FACC0':'blueviolet', 'SLVanillaCC0':'r','SLErrorCC0':'blue', 'SLAdvImgCC0':'c','SLAdvCostCC0':'green','SLLatentRobustCC0':'khaki',
+               'BPCC1':'lightgrey', 'FACC1':'mediumpurple', 'SLVanillaCC1':'salmon','SLErrorCC1':'lightsteelblue', 'SLAdvImgCC1':'c','SLAdvCostCC1':'lightgreen','SLLatentRobustCC1':'darkgoldenrod',
+               'SLConv1':'sandybrown' }
+# colors =  {'BP':'k', 'FA':'grey', 'SLVanilla':'r','SLRobust':'salmon',
+#             'SLError':'orange', 'SLErrorTemplateGenerator':'yellow', 'BSL':'b','SLGAN':'m'}
+
+
+methods = all_methods #['BP','FA','SLVanilla','SLGAN' ]#',,'SLRobust', 'SLError''SLRobust', 'SLError' ,'BSL',  'SLErrorTemplateGenerator' 'SLError', 
+
+print(methods)
 
 if args.eval_RDMs:
     RDMs_dict = {}
@@ -71,39 +89,59 @@ if args.eval_robust:
     maxitr = 4
     Test_acce = {}
     epsilons = [0, 0.2, 0.4, 0.6, 0.8, 1]
-    for method in  methods:#,'SLError','SLTemplateGenerator'
+    existing_methods = []
+    for method in  methods:
         Test_acce_arr = np.zeros((4, 6))
         for ie , epsilon in enumerate(epsilons):
             # json_name = '%s_%s_eval%s_maxitr4_epsilon%0.1e.json'%(args.runname, method, args.eval_time, epsilon)
             json_name = '%s%s_%s_eval%s_maxitr%d_epsilon%0.1e_noisesigma2%s.json'%(args.databasedir,args.runname, method, args.eval_time, maxitr, epsilon, sigma2)
 
             print(json_name)
-            with open(json_name, 'r') as fp:
-                            
-                results = json.load(fp)   
-                Test_acce_arr[:, ie] = results['Test_acce']     
-                Test_acce.update({method:Test_acce_arr})
+            try:
+                with open(json_name, 'r') as fp:
+                                
+                    results = json.load(fp)   
+                    Test_acce_arr[:, ie] = results['Test_acce']     
+                    Test_acce.update({method:Test_acce_arr})
+                existing_methods.append(method)
+            except FileNotFoundError:
+                continue
+
 else:
     Test_acce = {}
     Train_acce = {}
     Test_lossd = {}
     Train_lossd = {}
+    Test_lossl = {}
+    Train_lossl = {}
     Test_corrd = {}
     Train_corrd = {}
 
-    for method in  methods:#,'SLError','SLTemplateGenerator'
-        with open('%s%s_%s.json'%(args.databasedir,args.runname, method), 'r') as fp:
+    existing_methods = []
+    for method in  methods:
+        
+        try:
+            with open('%s%s_%s.json'%(args.databasedir,args.runname, method), 'r') as fp:
+                results = json.load(fp)        
+                Test_acce.update({method:results['Test_acce']})
+                Train_acce.update({method:results['Train_acce']})
+
+                Test_lossd.update({method:results['Test_lossd']})
+                Train_lossd.update({method:results['Train_lossd']})
+
+
+                Test_lossl.update({method:results['Test_lossl']})
+                Train_lossl.update({method:results['Train_lossl']})
+
+                Test_corrd.update({method:results['Test_corrd']})
+                Train_corrd.update({method:results['Train_corrd']})
+            existing_methods.append(method)
+        except FileNotFoundError:
+            print('%s%s_%s.json was not found'%(args.databasedir,args.runname, method))
+            continue
                         
-            results = json.load(fp)        
-            Test_acce.update({method:results['Test_acce']})
-            Train_acce.update({method:results['Train_acce']})
 
-            Test_lossd.update({method:results['Test_lossd']})
-            Train_lossd.update({method:results['Train_lossd']})
-
-            Test_corrd.update({method:results['Test_corrd']})
-            Train_corrd.update({method:results['Train_corrd']})
-
+existing_methods = np.unique(existing_methods)
 
 
 # args.resultsdir = args.resultsdir.replace('ConvMNIST_playground', 'SYY2020')
@@ -197,14 +235,16 @@ if args.eval_RDMs:
     plt.clf()
 
 elif args.eval_robust:
-
+    print(existing_methods)
     #------ accuracy ------------
     fig, axes = plt.subplots(nrows=1, ncols=4, figsize=[20,4])
 
     for itr in range(4):
-        for method in methods:
-
-            axes[itr].plot(epsilons, Test_acce[method][itr], color=colors[method], label=method)
+        for method in existing_methods:
+            if itr == 3 :
+                axes[itr].plot(epsilons, Test_acce[method][itr], color=colors[method], label=method)
+            else:
+                axes[itr].plot(epsilons, Test_acce[method][itr], color=colors[method])
 
         axes[itr].set_xlabel('epsilon')
         axes[itr].set_ylabel('Discrimination accuracy: percent correct')
@@ -214,14 +254,13 @@ elif args.eval_robust:
 
         fig.suptitle('%s dataset %s eval%s sigma2=%s'%(args.dataset, args.runname, args.eval_time, sigma2))
 
-        axes[3].legend()
-
         # axes[1].set_xticks([])
         # axes[1].set_yticks([])
         # axes[1].axis('off')
         # txt= axes[1].text(-0.1,-0.1,str(args),wrap=True, fontsize=8 )
         # txt._get_wrap_line_width = lambda : 200
 
+    axes[3].legend()
 
     fig.savefig(resultsdir+'robust_results_eval%s_sigma2_%s.pdf'%(args.eval_time, sigma2), dpi=200)
     fig.savefig(resultsdir+'robust_results_eval%s_sigma2_%s.png'%(args.eval_time, sigma2), dpi=200)
@@ -232,15 +271,34 @@ elif args.eval_robust:
 else:
 
     #------ accuracy ------------
+    summary_dic_Train = {}
+    summary_dic_Test = {}
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=[10,6])
 
-    for method in methods:
+    for method in existing_methods:
+         
             axes[0].plot(Train_acce[method], color=colors[method], ls='--')
 
             axes[0].plot(Test_acce[method], color=colors[method], label=method)
+        
+            print('Train ACC','%s:'%method, Train_acce[method][-1], end =" ")
+            print('**')
+            print('Test ACC','%s:'%method, Test_acce[method][-1], end =" ")
+            print('**')
+            summary_dic_Train.update({method: [Train_acce[method][-1], Train_lossd[method][-1], Train_lossl[method][-1],Train_corrd[method][-1], len(Train_acce[method])]})
+            summary_dic_Test.update({method: [Test_acce[method][-1], Test_lossd[method][-1], Test_lossl[method][-1],Test_corrd[method][-1], len(Test_acce[method])]})
 
+    df_train = pd.DataFrame.from_dict(summary_dic_Train, orient='index', columns=['Accuracy', 'LossPixel','LossLatent','CorrPixel','Epoch'])
+    df_train = df_train.sort_values('Accuracy', ascending=False)
 
-
+    df_test = pd.DataFrame.from_dict(summary_dic_Test, orient='index', columns=['Accuracy', 'LossPixel','LossLatent','CorrPixel','Epoch'])
+    df_test = df_test.sort_values('Accuracy', ascending=False)
+    print('*Train*')
+    print(df_train)
+    print('*Test*')
+    print(df_test)
+    df_train.to_csv(args.resultsdir+'df_train_%s.csv'%args.runname, sep=',')
+    df_test.to_csv(args.resultsdir+'df_test_%s.csv'%args.runname, sep=',')
     # # axes[0].plot(results['SLBP_Train'][:,1],  color='lightgrey', label='SLBP %.2f'%results['SLBP_Test'][0,1])
     # axes[0].plot(results['SLDecoderRobustOutput_Train'][:,1],  color='lightgrey', label='SLDecoderRobustOutput %.2f'%results['SLDecoderRobustOutput_Test'][0,1])
 
@@ -261,21 +319,15 @@ else:
 
     plt.clf()
 
-    print('************')
-    for method in methods:
-
-        print('Train ACC','%s:'%method, Train_acce[method][-1], end =" ")
-    print('**')
-    for method in methods:    
-        print('Test ACC','%s:'%method, Test_acce[method][-1], end =" ")
-    print('**')
     #------ reconstruction loss ------------
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=[10,6])
+    
+    for method in existing_methods:
+        
+        axes[0].plot(Train_lossd[method], color=colors[method], ls='--')
 
-    for method in methods:
-            axes[0].plot(Train_lossd[method], color=colors[method], ls='--')
-
-            axes[0].plot(Test_lossd[method], color=colors[method], label=method)
+        axes[0].plot(Test_lossd[method], color=colors[method], label=method)
+  
 
     axes[0].set_xlabel('epoch')
     axes[0].set_ylabel('Reconstruction loss: perpixel')
@@ -294,23 +346,17 @@ else:
 
     plt.clf()
 
-    print('************')
-    for method in methods:
-
-        print('Train LossD','%s:'%method, Train_lossd[method][-1], end =" ")
-    print('**')
-    for method in methods:    
-        print('Test LossD','%s:'%method, Test_lossd[method][-1], end =" ")
-    print('**')
 
 
     #------ reconstruction corr ------------
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=[10,6])
 
-    for method in methods:
-            axes[0].plot(Train_corrd[method], color=colors[method], ls='--')
+    for method in existing_methods:
 
-            axes[0].plot(Test_corrd[method], color=colors[method], label=method)
+
+        axes[0].plot(Train_corrd[method], color=colors[method], ls='--')
+
+        axes[0].plot(Test_corrd[method], color=colors[method], label=method)
 
     axes[0].set_xlabel('epoch')
     axes[0].set_ylabel('Reconstruction correlation')
@@ -329,11 +375,5 @@ else:
 
     plt.clf()
 
-    print('************')
-    for method in methods:
 
-        print('Train corrD','%s:'%method, Train_corrd[method][-1], end =" ")
-    print('**')
-    for method in methods:    
-        print('Test corrD','%s:'%method, Test_corrd[method][-1], end =" ")
-    print('**')
+

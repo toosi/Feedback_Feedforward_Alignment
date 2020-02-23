@@ -55,12 +55,15 @@ parser.add_argument('-ad', '--archd', metavar='ARCHD', default='ConvGene',
                     help='model architecture: ' +
                         ' | '.join(model_names) +
                         ' (default: resnet18)')
+parser.add_argument('-loadinitialization', default='', type=str, metavar='N',
+                    help='empty string| a previous runname')
+                        
 
-parser.add_argument('-advTraining', default=False, type=bool, metavar='N',
-                    help='if True it does FGSM advresarial training for each batch')
+# parser.add_argument('-advTraining', default=False, type=bool, metavar='N',
+#                     help='if True it does FGSM advresarial training for each batch')
 
-parser.add_argument('-cycleconsis', default=False, type=bool, metavar='N',
-                    help='if True it does CycleConsis for each batch')
+# parser.add_argument('-cycleconsis', default=False, type=bool, metavar='N',
+#                     help='if True it does CycleConsis for each batch')
 
 rundatetime = datetime.now().strftime('%b%d-%H-%M')
 import git
@@ -257,13 +260,6 @@ modelB = nn.parallel.DataParallel(getattr(custom_models, args.archd)(algorithm='
 modelC = nn.parallel.DataParallel(getattr(custom_models, args.arche)(algorithm='BP', base_channels=args.base_channels, image_channels=image_channels, n_classes=args.n_classes)).cuda() # Forward Control model to compare to BP
 
 
-
-# # modelC = nn.DataParallel(modelC)
-# print(modelF.state_dict().keys())
-# print("***** ***********")
-# print(modelC.state_dict().keys())
-
-modelC.load_state_dict(toggle_state_dict_YYtoBP(modelF.state_dict(), modelC.state_dict()))
 # print(modelC.state_dict().keys())
 
 
@@ -331,35 +327,83 @@ criterionF = nn.CrossEntropyLoss() #
 criterionB = nn.MSELoss() #
 
 
-print('***** Creating initial state dicts *********')
 
-modelF_nottrained = copy.deepcopy(modelF.state_dict())
-modelB_nottrained = copy.deepcopy(modelB.state_dict())
-modelC_nottrained = copy.deepcopy(modelC.state_dict())
+# either load initializatin from a previous run (make sure the same architecture/optim/sched)
+#or generate and save new initialization
+if len(args.loadinitialization):
 
-optimizerF_original = copy.deepcopy(optimizerF.state_dict())
-optimizerB_original = copy.deepcopy(optimizerB.state_dict())
-optimizerC_original = copy.deepcopy(optimizerC.state_dict())
+    loaddir = path_prefix+'/Results/Symbio/Symbio/%s/'%args.loadinitialization
+    print('*** Loading initializations from %s'%loaddir)
+    
+    modelF_nottrained = torch.load(loaddir+'modelF_untrained.pt')
+    modelB_nottrained = torch.load(loaddir+'modelB_untrained.pt')
+    modelC_nottrained = torch.load(loaddir+'modelC_untrained.pt')
 
-schedulerF_original = copy.deepcopy(schedulerF.state_dict())
-schedulerB_original = copy.deepcopy(schedulerB.state_dict())
-schedulerC_original = copy.deepcopy(schedulerC.state_dict())
+    optimizerF_original = torch.load(loaddir+'optimizerF_original.pt')
+    optimizerB_original = torch.load(loaddir+'optimizerB_original.pt')
+    optimizerC_original = torch.load(loaddir+'optimizerC_original.pt')
 
-torch.save(modelF_nottrained, args.resultsdir+'modelF_untrained.pt')
-torch.save(modelB_nottrained, args.resultsdir+'modelB_untrained.pt')
-torch.save(modelC_nottrained, args.resultsdir+'modelC_untrained.pt')
+    schedulerF_original = torch.load(loaddir+'schedulerF_original.pt')
+    schedulerB_original = torch.load(loaddir+'schedulerB_original.pt')
+    schedulerC_original = torch.load(loaddir+'schedulerC_original.pt')
 
-torch.save(optimizerF_original, args.resultsdir+'optimizerF_original.pt')
-torch.save(optimizerB_original, args.resultsdir+'optimizerB_original.pt')
-torch.save(optimizerC_original, args.resultsdir+'optimizerC_original.pt')
+        
+    modelF.load_state_dict(modelF_nottrained)
+    modelB.load_state_dict(modelB_nottrained)
+    modelC.load_state_dict(modelC_nottrained)
 
-torch.save(schedulerF_original, args.resultsdir+'schedulerF_original.pt')
-torch.save(schedulerB_original, args.resultsdir+'schedulerB_original.pt')
-torch.save(schedulerC_original, args.resultsdir+'schedulerC_original.pt')
+    optimizerF.load_state_dict(optimizerF_original)
+    optimizerB.load_state_dict(optimizerB_original)
+    optimizerC.load_state_dict(optimizerC_original)
+
+    schedulerF.load_state_dict(schedulerF_original)
+    schedulerB.load_state_dict(schedulerB_original)
+    schedulerC.load_state_dict(schedulerC_original)
+
+    torch.save(modelF_nottrained, args.resultsdir+'modelF_untrained.pt')
+    torch.save(modelB_nottrained, args.resultsdir+'modelB_untrained.pt')
+    torch.save(modelC_nottrained, args.resultsdir+'modelC_untrained.pt')
+
+    torch.save(optimizerF_original, args.resultsdir+'optimizerF_original.pt')
+    torch.save(optimizerB_original, args.resultsdir+'optimizerB_original.pt')
+    torch.save(optimizerC_original, args.resultsdir+'optimizerC_original.pt')
+
+    torch.save(schedulerF_original, args.resultsdir+'schedulerF_original.pt')
+    torch.save(schedulerB_original, args.resultsdir+'schedulerB_original.pt')
+    torch.save(schedulerC_original, args.resultsdir+'schedulerC_original.pt')
 
 
-with open(args.resultsdir+"architecture_modelF.txt", "w") as text_file:
-    print("modelF: {}".format(modelF), file=text_file)
+else:
+    print('***** Creating new initial state dicts *********')
 
-with open(args.resultsdir+"architecture_modelB.txt", "w") as text_file:
-    print("modelB: {}".format(modelB), file=text_file)
+    modelC.load_state_dict(toggle_state_dict_YYtoBP(modelF.state_dict(), modelC.state_dict()))
+    modelF_nottrained = copy.deepcopy(modelF.state_dict())
+    modelB_nottrained = copy.deepcopy(modelB.state_dict())
+    modelC_nottrained = copy.deepcopy(modelC.state_dict())
+
+    optimizerF_original = copy.deepcopy(optimizerF.state_dict())
+    optimizerB_original = copy.deepcopy(optimizerB.state_dict())
+    optimizerC_original = copy.deepcopy(optimizerC.state_dict())
+
+    schedulerF_original = copy.deepcopy(schedulerF.state_dict())
+    schedulerB_original = copy.deepcopy(schedulerB.state_dict())
+    schedulerC_original = copy.deepcopy(schedulerC.state_dict())
+
+    torch.save(modelF_nottrained, args.resultsdir+'modelF_untrained.pt')
+    torch.save(modelB_nottrained, args.resultsdir+'modelB_untrained.pt')
+    torch.save(modelC_nottrained, args.resultsdir+'modelC_untrained.pt')
+
+    torch.save(optimizerF_original, args.resultsdir+'optimizerF_original.pt')
+    torch.save(optimizerB_original, args.resultsdir+'optimizerB_original.pt')
+    torch.save(optimizerC_original, args.resultsdir+'optimizerC_original.pt')
+
+    torch.save(schedulerF_original, args.resultsdir+'schedulerF_original.pt')
+    torch.save(schedulerB_original, args.resultsdir+'schedulerB_original.pt')
+    torch.save(schedulerC_original, args.resultsdir+'schedulerC_original.pt')
+
+
+    with open(args.resultsdir+"architecture_modelF.txt", "w") as text_file:
+        print("modelF: {}".format(modelF), file=text_file)
+
+    with open(args.resultsdir+"architecture_modelB.txt", "w") as text_file:
+        print("modelB: {}".format(modelB), file=text_file)

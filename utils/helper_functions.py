@@ -74,6 +74,8 @@ import matplotlib
 matplotlib.use('agg')
 import matplotlib.pylab as plt
 
+classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+
 def generate_sample_images(images, target, title, param_dict, args):
 
     fig, axes = plt.subplots(nrows=1, ncols=5, figsize=[6,2])
@@ -88,7 +90,10 @@ def generate_sample_images(images, target, title, param_dict, args):
             implot = implot.squeeze()
         axes[im].imshow(implot)
         axes[im].axis('off')
-        axes[im].set_title('C=%s'%target[im].item())
+        if args.dataset == 'CIFAR10':
+            axes[im].set_title('C=%s'%classes[target[im].item()])
+        else: 
+            axes[im].set_title('C=%s'%target[im].item())
     fig.suptitle(args.runname + ', %s: %s'%(title, param_dict), fontsize=8)
     fig.savefig(args.resultsdir+'%s_samples_eval%s_%s_%s.png'%(title, args.eval_time, args.method, param_dict), dpi=200)
     fig.savefig(args.resultsdir+'%s_samples_eval%s_%s_%s.pdf'%(title, args.eval_time, args.method, param_dict), dpi=200)
