@@ -3,7 +3,9 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 import torchvision.models as models
-from modules import customized_modules
+
+# To test a new version of imp;ementing FA
+from modules import customized_modules_new as customized_modules
 # print('******* in custom_models',torch.__version__,'*******')
 # print(torch.__file__)
 

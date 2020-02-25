@@ -899,7 +899,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 losse.backward()
                 images_grad = images.grad.data
 
-                train_epsilon=0.4
+                train_epsilon=0.2
                 perturbed_images = fgsm_attack(images, train_epsilon, images_grad)
                 
                 gener = recons
