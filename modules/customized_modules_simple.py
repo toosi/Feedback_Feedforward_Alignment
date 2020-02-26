@@ -11,9 +11,17 @@ def linear_fa_backward_hook(module, grad_input, grad_output):
     if grad_input[1] is not None:
         grad_input_fa = grad_output[0].mm(module.weight_feedback)
         return (grad_input[0], grad_input_fa) + grad_input[2:]
+
 def conv2d_fa_backward_hook(module, grad_input, grad_output):
     if grad_input[0] is not None:
         grad_input_fa = torch.nn.grad.conv2d_input(grad_input[0].size(), module.weight_feedback, grad_output[0], stride=module.stride, padding=module.padding, dilation=module.dilation, groups=module.groups)
+        return (grad_input_fa,) + grad_input[1:]
+
+def convtranspose2d_fa_backward_hook(module, grad_input, grad_output):
+    # print(module)
+    # print(grad_output[0].shape)
+    if grad_input[0] is not None:
+        grad_input_fa = convTranspose2d_input(grad_input[0].size(), module.weight_feedback, grad_output[0], stride=module.stride, padding=module.padding, dilation=module.dilation, groups=module.groups)
         return (grad_input_fa,) + grad_input[1:]
 
 
@@ -46,17 +54,20 @@ def convTranspose2d_input(input_size, weight, grad_output, stride=1, padding=0,o
     kernel_size = (weight.shape[2], weight.shape[3])
     if input_size is None:
         raise ValueError("grad.conv2d_input requires specifying an input_size")
-    grad_input_padding = torch.nn.grad._grad_input_padding(grad_output, input_size, stride,
-                                             padding, kernel_size)
-    return torch.conv_transpose2d(
-        grad_output, weight, None, stride, padding,output_padding, grad_input_padding, groups,
-        dilation)
+    # grad_input_padding = torch.nn.grad._grad_input_padding(grad_output, input_size, stride,
+    #                                          padding, kernel_size)
+    return torch.conv2d(
+        grad_output, weight, None, stride, padding, dilation, groups)
 
+# conv2d ---> n_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros'
 
-def convtranspose2d_fa_backward_hook(module, grad_input, grad_output):
-    if grad_input[0] is not None:
-        grad_input_fa = convTranspose2d_input(grad_input[0].size(), module.weight_feedback, grad_output[0], stride=module.stride, padding=module.padding, output_padding=module.output_padding, dilation=module.dilation, groups=module.groups)
-        return (grad_input_fa,) + grad_input[1:]
+# conv_transpose2d ---> n_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, dilation=1, padding_mode='zeros'
+
+# def convtranspose2d_fa_backward_hook(module, grad_input, grad_output):
+#     if grad_input[0] is not None:
+#         grad_input_fa = convTranspose2d_input(grad_input[0].size(), module.weight_feedback, grad_output[0], stride=module.stride, padding=module.padding, output_padding=module.output_padding, dilation=module.dilation, groups=module.groups)
+#         return (grad_input_fa,) + grad_input[1:]
+
 class LinearModule(nn.Module):
     """
     Implementation of a linear module which uses random feedback weights
@@ -92,17 +103,7 @@ class LinearModule(nn.Module):
         return 'in_features={}, out_features={}, bias={}'.format(
             self.in_features, self.out_features, self.bias is not None
         )
-# class LinearFA(_LinearFA):
-#     """
-#     Implementation of a linear module which uses random feedback weights
-#     in its backward pass, as described in Lillicrap et al., 2016:
-#     https://www.nature.com/articles/ncomms13276
-#     """
-#     def __init__(self, in_features, out_features, bias=True):
-#         super(LinearFA, self).__init__(in_features, out_features, bias=True)
-#         self.register_backward_hook(linear_fa_backward_hook)
-#     def forward(self, input):
-#         return F.linear(input, self.weight, self.bias)
+
 class _ConvNdFA(nn.Module):
     """
     Implementation of an N-dimensional convolution module which uses random feedback weights
@@ -201,6 +202,8 @@ class AsymmetricFeedbackConv2d(_ConvNdFA):
                             _pair(0), self.dilation, self.groups)
         return F.conv2d(input, self.weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)
+
+
 # form https://pytorch.org/docs/stable/_modules/torch/nn/modules/conv.html#ConvTranspose2d
 class _ConvTransposeMixin(object):
     def _output_padding(self, input, output_size, stride, padding, kernel_size):
@@ -236,7 +239,7 @@ class _ConvTransposeMixin(object):
                 res.append(output_size[d] - min_sizes[d])
             ret = res
         return ret
-
+        
 class AsymmetricFeedbackConvTranspose2d(_ConvTransposeMixin, _ConvNdFA):
     r"""Applies a 2D transposed convolution operator over an input image
     composed of several input planes.
@@ -252,7 +255,9 @@ class AsymmetricFeedbackConvTranspose2d(_ConvTransposeMixin, _ConvNdFA):
         super(AsymmetricFeedbackConvTranspose2d, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
             True, output_padding, groups, bias, padding_mode)
+
         self.register_backward_hook(convtranspose2d_fa_backward_hook)
+
     def forward(self, input, output_size=None):
         # type: (Tensor, Optional[List[int]]) -> Tensor
         if self.padding_mode != 'zeros':

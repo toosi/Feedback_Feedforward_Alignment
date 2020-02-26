@@ -10,7 +10,7 @@ needs state_dict_utils.toggle_state_dict_resnets to toggle the weights in SL
 
 import torch
 import torch.nn as nn
-from modules import customized_modules
+from modules import customized_modules_simple as customized_modules
 try:
     from torch.hub import load_state_dict_from_url
 except ImportError:
@@ -569,10 +569,10 @@ class AsymResNetT(nn.Module):
         # x = self.upsamp(x) # instead of maxpool in Fw
 
         x = self.relu(x)
-        x = self.bn1(x)
-        x = self.conv1(x)
+        xbeforeconv1 = self.bn1(x)
+        x = self.conv1(xbeforeconv1)
 
-        return x
+        return xbeforeconv1, x
 
     def forward(self, x):
         return self._forward_impl(x)

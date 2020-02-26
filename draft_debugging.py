@@ -74,19 +74,19 @@ inputs = latent.detach() # torch.rand([5, 1024, 4, 4]).cuda()
 output = modelB(inputs)
 print(output.shape)
 
-# # # print(modelB.state_dict().keys())
-# pp = pprint.PrettyPrinter(indent=4)
-# print('DECODER**********')
-# pp.pprint([(k,modelB.state_dict()[k].shape) for k in modelB.state_dict().keys()])
+# # print(modelB.state_dict().keys())
+pp = pprint.PrettyPrinter(indent=4)
+print('DECODER**********')
+pp.pprint([(k,modelB.state_dict()[k].shape) for k in modelB.state_dict().keys()])
 
-# # # modelBT_state_dict = toggle_state_dict(modelB.state_dict(),modelF.state_dict())
-# # # print('DECODER AFTER**********')
-# # # pp.pprint([(k,modelBT_state_dict[k].shape) for k in modelBT_state_dict.keys()])
+# # modelBT_state_dict = toggle_state_dict(modelB.state_dict(),modelF.state_dict())
+# # print('DECODER AFTER**********')
+# # pp.pprint([(k,modelBT_state_dict[k].shape) for k in modelBT_state_dict.keys()])
 
 
-# modelF.load_state_dict(toggle_state_dict(modelB.state_dict(),modelF.state_dict()))
+modelF.load_state_dict(toggle_state_dict(modelB.state_dict(),modelF.state_dict()))
 
-# modelB.load_state_dict(toggle_state_dict(modelF.state_dict(),modelB.state_dict()))
+modelB.load_state_dict(toggle_state_dict(modelF.state_dict(),modelB.state_dict()))
 
 
 
