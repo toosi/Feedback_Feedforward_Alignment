@@ -807,6 +807,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
 
         if args.method not in ['BSL']:
             # modelB.load_state_dict(toggle_state_dict(modelF.state_dict(), modelB.state_dict()))
+            
             if 'AsymResLNet' in args.arche:
                 modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))
             elif 'asymresnet' in args.arche:

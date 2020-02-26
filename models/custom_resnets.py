@@ -5,6 +5,7 @@ no bn with tapering,no bn after down/upsample (down/upsample is not Sequiential)
 maxpool??
 addec conv2 at the end: number of output channels=n_classes
 inplace=False for ReLUs
+, bias=False
 needs state_dict_utils.toggle_state_dict_resnets to toggle the weights in SL
 """
 
@@ -47,13 +48,13 @@ model_urls = {
 }
 
 
-def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1, algorithm='BP'):
+def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1, bias=False, algorithm='BP'):
     """3x3 convolution with padding"""
     return Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=dilation, groups=groups, bias=False, dilation=dilation, algorithm=algorithm)
 
 
-def conv1x1(in_planes, out_planes, stride=1, algorithm='BP'):
+def conv1x1(in_planes, out_planes, stride=1, bias=False, algorithm='BP'):
     """1x1 convolution"""
     return Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False, algorithm=algorithm)
 
@@ -72,10 +73,10 @@ class BasicBlock(nn.Module):
         if dilation > 1:
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
-        self.conv1 = conv3x3(inplanes, planes, stride, algorithm=algorithm)
+        self.conv1 = conv3x3(inplanes, planes, stride, bias=False, algorithm=algorithm)
         # self.bn1 = norm_layer(planes)
         self.relu = nn.ReLU(inplace=False)
-        self.conv2 = conv3x3(planes, planes, algorithm=algorithm)
+        self.conv2 = conv3x3(planes, planes, bias=False, algorithm=algorithm)
         self.bn2 = norm_layer(planes, track_running_stats=False)
         self.downsample = downsample
         self.stride = stride
@@ -110,11 +111,11 @@ class Bottleneck(nn.Module):
             norm_layer = nn.BatchNorm2d
         width = int(planes * (base_width / 64.)) * groups
         # Both self.conv2 and self.downsample layers downsample the input when stride != 1
-        self.conv1 = conv1x1(inplanes, width, algorithm=algorithm)
+        self.conv1 = conv1x1(inplanes, width, bias=False, algorithm=algorithm)
         self.bn1 = norm_layer(width)
-        self.conv2 = conv3x3(width, width, stride, groups, dilation, algorithm=algorithm)
+        self.conv2 = conv3x3(width, width, stride, groups, dilation, bias=False, algorithm=algorithm)
         self.bn2 = norm_layer(width)
-        self.conv3 = conv1x1(width, planes * self.expansion, algorithm=algorithm)
+        self.conv3 = conv1x1(width, planes * self.expansion, bias=False, algorithm=algorithm)
         self.bn3 = norm_layer(planes * self.expansion)
         self.relu = nn.ReLU(inplace=False)
         self.downsample = downsample
@@ -206,7 +207,7 @@ class AsymResNet(nn.Module):
             self.dilation *= stride
             stride = 1
         if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = conv1x1(self.inplanes, planes * block.expansion, stride, algorithm=algorithm)
+            downsample = conv1x1(self.inplanes, planes * block.expansion, stride, bias=False, algorithm=algorithm)
                 # norm_layer(planes * block.expansion, track_running_stats=False),
             
 
@@ -371,13 +372,13 @@ def wide_asymresnet101_2(pretrained=False, progasymress=True, **kwargs):
 Backward 
 """
 
-def convT3x3(in_planes, out_planes, stride=1, groups=1, dilation=1, algorithm='BP'):
+def convT3x3(in_planes, out_planes, stride=1, groups=1, dilation=1, bias=False, algorithm='BP'):
     """3x3 convolution with padding"""
     return ConvTranspose2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=dilation, groups=groups, bias=False, dilation=dilation, algorithm=algorithm)
 
 
-def convT1x1(in_planes, out_planes, stride=1, algorithm='BP'):
+def convT1x1(in_planes, out_planes, stride=1, bias=False, algorithm='BP'):
     """1x1 convolution"""
     return ConvTranspose2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False, algorithm=algorithm)
 
@@ -396,10 +397,10 @@ class BasicBlockT(nn.Module):
         if dilation > 1:
             raise NotImplementedError("Dilation > 1 not supported in BasicBlockT")
         # Both self.conv1 and self.upsample layers upsample the input when stride != 1
-        self.conv1 = convT3x3(planes, inplanes,  stride, algorithm=algorithm)
+        self.conv1 = convT3x3(planes, inplanes,  stride, bias=False, algorithm=algorithm)
         # self.bn1 = norm_layer(inplanes, track_running_stats=False)
         self.relu = nn.ReLU(inplace=False)
-        self.conv2 = convT3x3(planes, planes, algorithm=algorithm)
+        self.conv2 = convT3x3(planes, planes, bias=False, algorithm=algorithm)
         self.bn2 = norm_layer(planes, track_running_stats=False)
         self.upsample = upsample
         self.stride = stride
@@ -434,11 +435,11 @@ class BottleneckT(nn.Module):
             norm_layer = nn.BatchNorm2d
         width = int(planes * (base_width / 64.)) * groups
         # Both self.conv2 and self.upsample layers upsample the input when stride != 1
-        self.conv1 = convT1x1(width, inplanes, algorithm=algorithm)
+        self.conv1 = convT1x1(width, inplanes, bias=False, algorithm=algorithm)
         self.bn1 = norm_layer(width, track_running_stats=False)
-        self.conv2 = convT3x3(width, width, stride, groups, dilation, algorithm=algorithm)
+        self.conv2 = convT3x3(width, width, stride, groups, dilation, bias=False, algorithm=algorithm)
         self.bn2 = norm_layer(width, track_running_stats=False)
-        self.conv3 = convT1x1(width, planes * self.expansion, algorithm=algorithm)
+        self.conv3 = convT1x1(width, planes * self.expansion, bias=False, algorithm=algorithm)
         self.bn3 = norm_layer(planes * self.expansion, track_running_stats=False)
         self.relu = nn.ReLU(inplace=False)
         self.upsample = upsample
@@ -490,7 +491,7 @@ class AsymResNetT(nn.Module):
         self.base_width = width_per_group
 
         self.conv2 = ConvTranspose2d(n_classes, 512, kernel_size=3, stride=1, padding=1,
-                               bias=False, algorithm=algorithm)
+                                bias=False, padding_mode='zeros', algorithm=algorithm)
         self.layer4 = self._make_layer(block, 256, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2], algorithm=algorithm)
         self.layer3 = self._make_layer(block, 128, layers[2], stride=2,
@@ -540,7 +541,7 @@ class AsymResNetT(nn.Module):
         
 
         if stride != 1 or self.inplanes != int(planes / block.expansion):
-            upsample = convT1x1(self.inplanes, int(planes / block.expansion), stride, algorithm=algorithm)
+            upsample = convT1x1(self.inplanes, int(planes / block.expansion), stride, bias=False, algorithm=algorithm)
                 # norm_layer(int(planes / block.expansion)),
             
 

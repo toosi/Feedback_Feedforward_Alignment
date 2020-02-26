@@ -71,7 +71,7 @@ modelB = nn.parallel.DataParallel(getattr(custom_models, arch)(**args_model).cud
 
 inputs = latent.detach() # torch.rand([5, 1024, 4, 4]).cuda()
 # # inputs = torch.zeros([1, 3, 32, 32]).cuda()
-output = modelB(inputs)
+conv1, output = modelB(inputs)
 print(output.shape)
 
 # # print(modelB.state_dict().keys())

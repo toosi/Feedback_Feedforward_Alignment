@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
-from torch.autograd import Variable
+import copy
 from torch.nn.parameter import Parameter
 from torch.nn.modules.utils import _single, _pair
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -25,7 +25,7 @@ def convtranspose2d_fa_backward_hook(module, grad_input, grad_output):
         return (grad_input_fa,) + grad_input[1:]
 
 
-def convTranspose2d_input(input_size, weight, grad_output, stride=1, padding=0,output_padding=0, dilation=1, groups=1):
+def convTranspose2d_input(input_size, weight, grad_output, stride=1, padding=0, output_padding=0, dilation=1, groups=1):
     r"""
     TT copied from https://github.com/pytorch/pytorch/blob/master/torch/nn/grad.py
     Computes the gradient of conv2d(trasnposed) with respect to the input of the convolution.
@@ -75,13 +75,13 @@ class LinearModule(nn.Module):
     https://www.nature.com/articles/ncomms13276
     """
     __constants__ = ['bias', 'in_features', 'out_features']
-    def __init__(self, in_features, out_features, bias=True, algorithm='FA'):
+    def __init__(self, in_features, out_features, bias=False, algorithm='FA'):
         super(LinearModule, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.weight = Parameter(torch.Tensor(out_features, in_features))
         if algorithm == 'BP':
-                self.weight_feedback = copy.deepcopy(weight).clone()
+            self.weight_feedback = copy.deepcopy(self.weight).clone()
         else:
             self.weight_feedback = Parameter(torch.FloatTensor(out_features, in_features), requires_grad=False)
         if bias:
@@ -115,7 +115,7 @@ class _ConvNdFA(nn.Module):
     __constants__ = ['stride', 'padding', 'dilation', 'groups', 'bias', 'padding_mode']
     def __init__(self, in_channels, out_channels, kernel_size, stride,
                  padding, dilation, transposed, output_padding,
-                 groups, bias, padding_mode, algorithm='FA'):
+                 groups, padding_mode, bias=False, algorithm='FA'):
         super(_ConvNdFA, self).__init__()
         if in_channels % groups != 0:
             raise ValueError('in_channels must be divisible by groups')
@@ -135,7 +135,7 @@ class _ConvNdFA(nn.Module):
             self.weight = Parameter(torch.Tensor(
                 in_channels, out_channels // groups, *kernel_size))
             if algorithm == 'BP':
-                self.weight_feedback = copy.deepcopy(weight).clone()
+                self.weight_feedback = copy.deepcopy(self.weight)
             else:
 
                 self.weight_feedback = Parameter(torch.Tensor(
@@ -144,7 +144,7 @@ class _ConvNdFA(nn.Module):
             self.weight = Parameter(torch.Tensor(
                 out_channels, in_channels // groups, *kernel_size))
             if algorithm == 'BP':
-                self.weight_feedback = copy.deepcopy(weight).clone()
+                self.weight_feedback = copy.deepcopy(self.weight)
             else:
                 self.weight_feedback = Parameter(torch.Tensor(
                 out_channels, in_channels // groups, *kernel_size), requires_grad=False)
@@ -184,14 +184,14 @@ class AsymmetricFeedbackConv2d(_ConvNdFA):
     """
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1,
-                 bias=True, padding_mode='zeros', algorithm='FA'):
+                 bias=False, padding_mode='zeros', algorithm='FA'):
         kernel_size = _pair(kernel_size)
         stride = _pair(stride)
         padding = _pair(padding)
         dilation = _pair(dilation)
         super(AsymmetricFeedbackConv2d, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
-            False, _pair(0), groups, bias, padding_mode)
+            transposed=False, output_padding=_pair(0), groups=groups, bias=bias, padding_mode=padding_mode, algorithm=algorithm)
         self.register_backward_hook(conv2d_fa_backward_hook)
     def forward(self, input):
         if self.padding_mode == 'circular':
@@ -245,7 +245,7 @@ class AsymmetricFeedbackConvTranspose2d(_ConvTransposeMixin, _ConvNdFA):
     composed of several input planes.
     """
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, output_padding=0, groups=1, bias=True,
+                 padding=0, output_padding=0, groups=1, bias=False,
                  dilation=1, padding_mode='zeros', algorithm='FA'):
         kernel_size = _pair(kernel_size)
         stride = _pair(stride)
@@ -254,14 +254,14 @@ class AsymmetricFeedbackConvTranspose2d(_ConvTransposeMixin, _ConvNdFA):
         output_padding = _pair(output_padding)
         super(AsymmetricFeedbackConvTranspose2d, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
-            True, output_padding, groups, bias, padding_mode)
+            transposed=True, output_padding=output_padding, groups=groups, bias=bias, padding_mode=padding_mode, algorithm=algorithm)
 
         self.register_backward_hook(convtranspose2d_fa_backward_hook)
 
     def forward(self, input, output_size=None):
         # type: (Tensor, Optional[List[int]]) -> Tensor
-        if self.padding_mode != 'zeros':
-            raise ValueError('Only `zeros` padding mode is supported for ConvTranspose2d')
+        # if self.padding_mode != 'zeros':
+        #     raise ValueError('Only `zeros` padding mode is supported for ConvTranspose2d, %s is not supported'%self.padding_mode)
         output_padding = self._output_padding(input, output_size, self.stride, self.padding, self.kernel_size)
         return F.conv_transpose2d(
             input, self.weight, self.bias, self.stride, self.padding,
