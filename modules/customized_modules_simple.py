@@ -192,7 +192,8 @@ class AsymmetricFeedbackConv2d(_ConvNdFA):
         super(AsymmetricFeedbackConv2d, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
             transposed=False, output_padding=_pair(0), groups=groups, bias=bias, padding_mode=padding_mode, algorithm=algorithm)
-        self.register_backward_hook(conv2d_fa_backward_hook)
+        if algorithm == 'FA':
+            self.register_backward_hook(conv2d_fa_backward_hook)
     def forward(self, input):
         if self.padding_mode == 'circular':
             expanded_padding = ((self.padding[1] + 1) // 2, self.padding[1] // 2,
@@ -255,8 +256,8 @@ class AsymmetricFeedbackConvTranspose2d(_ConvTransposeMixin, _ConvNdFA):
         super(AsymmetricFeedbackConvTranspose2d, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
             transposed=True, output_padding=output_padding, groups=groups, bias=bias, padding_mode=padding_mode, algorithm=algorithm)
-
-        self.register_backward_hook(convtranspose2d_fa_backward_hook)
+        if algorithm == 'FA':
+            self.register_backward_hook(convtranspose2d_fa_backward_hook)
 
     def forward(self, input, output_size=None):
         # type: (Tensor, Optional[List[int]]) -> Tensor

@@ -1,13 +1,12 @@
 #!/bin/sh
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
-#SBATCH -c 20
+#SBATCH -c 4
 #SBATCH --gres=gpu:1
-#SBATCH --mem=40gb
-#SBATCH --array=0-2
+#SBATCH --mem=18gb
+#  #SBATCH --array=0-5
 #SBATCH --time=5-00:00:00
-## SBATCH --exclude ax07
-#SBATCH 
+
 if [ X"$SLURM_STEP_ID" = "X" -a X"$SLURM_PROCID" = "X"0 ]
 then
   echo " =========================================="
@@ -18,7 +17,7 @@ fi
 
 module load anaconda3-2019.03
 
-source activate /home/tt2684/conda-envs/pytorch_tensorflow_cuttingedge
+source activate /home/tt2684/conda-envs/pytorch_tensorflow_SYNPAI_CUDA100cudnn75
 
 now=$(date +'%Y-%m-%d_%H-%M')
 note='**Refactor_test**'
@@ -34,23 +33,26 @@ printf "********************************************************** \n"
 ####Command to execute Python program
 config=0
 init=Feb14-09-08_CIFAR10_a3e0466f41_592
-# python -u create_config.py -dataset imagenet  -j 24 --input_size 224 --base_channels 64 --batch-size 64 --epoch 500 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 10 --patienced 8 -p 100 --note  $note ; config=1  #
-# python -u create_config.py -dataset CIFAR10  -loadinitialization $init -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 1000 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py -dataset imagenet  -j 24 --input_size 224  --batch-size 128 --epoch 500 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 10 --patienced 8 -p 100 --note  $note ; config=1  #
+# python -u create_config.py -dataset CIFAR10 -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 1000 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 # python -u create_config.py -dataset MNIST  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 150 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+
+# python -u create_config.py -dataset CIFAR10 -j 24 --input_size 32 --batch-size 256 --epoch 500 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-1 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 20 --patienced 150 -p 100 --note  $note ; config=1  #
+
 
 if [ $config == 0 ]
     then
-    runname='Feb26-13-35_MNIST_762fd655b5_86'  #
+    runname='Feb27-10-00_CIFAR10_70a668ed7c_675'  #
     configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
     # methods=('SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'BP' 'FA' 'SLVanilla' 'SLError' )
     # methods=('SLAdvImgCC0' 'SLAdvCostCC0' 'BPCC0' 'FACC0' 'SLVanillaCC0' 'SLErrorCC0' )
     # methods=('BPCC1' 'FACC1' 'SLVanillaCC1' 'SLErrorCC1' 'SLAdvImgCC1' 'SLAdvCostCC1')
-    methods=('BP' 'FA' 'SLVanilla')
-    python -u main_train.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
+    # methods=('BP' 'FA' 'SLVanilla' 'SLLatentRobust' 'SLAdvImg' 'SLError')
+    # python -u main_train.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
     
     # SLConv1 needs to be run in one gpu because of hooks
     # python -u main_train.py --method SLLatentRobustCC1  --config-file $configpath
-    # python -u main_train.py --method SLConv1  --config-file $configpath
+    python -u main_train.py --method SLGrConv1  --config-file $configpath
     # python -u main_train.py --method BSL  --config-file $configpath
     # python -u main_train.py --method SLVanilla  --config-file $configpath
     # python -u main_train.py --method FA --config-file $configpath

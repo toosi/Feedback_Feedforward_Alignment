@@ -864,7 +864,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 repb = torch.norm(output)*repb/torch.norm(repb)
 
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                gener = modelB(repb.detach())
+                _, gener = modelB(repb.detach())
                 reference = images - F.interpolate(recons, size=images.shape[-1])
 
             elif 'SLRobust' in args.method:
@@ -921,8 +921,26 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
 
                 _, output_gener = modelF(F.interpolate(gener, size=images.shape[-1]))
             
+            elif 'SLGrConv1' in args.method:
+                # !!! requires to be run on a single gpu because of hooks !!!
+                hookF = Hook(list(modelF.module._modules.items())[0][1])
+                latent, output = modelF(images)
+                conv1 = hookF.output.detach()
+
+                prob = nn.Softmax(dim=1)(output.detach())
+                repb = onehot - prob
+
+                repb = torch.norm(output)*repb/torch.norm(repb)
+
+                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                preconv1,_ = modelB(repb.detach())
+
+                
+                gener = preconv1
+                reference = conv1
+            
             elif 'SLConv1' in args.method:
-                # requires to be run on a single gpu because of hooks 
+                # !!!  requires to be run on a single gpu because of hooks  !!! 
                 hookF = Hook(list(modelF.module._modules.items())[0][1])
                 latent, output = modelF(images)
                 conv1 = hookF.output.detach()
@@ -997,8 +1015,9 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
 
         latents, _ = modelF(images)
         _, recons = modelB(latents.detach())
-        latents_gener, output_gener = modelF(F.interpolate(recons, size=images.shape[-1]).detach())
-        lossL = criteriond(latents_gener, latents.detach())
+        # recons_interp = F.interpolate(recons, size=images.shape[-1])
+        # latents_gener, output_gener = modelF(recons_interp.detach())
+        lossL = torch.tensor([0]) # criteriond(latents_gener, latents.detach())
 
 
         losslatent.update(lossL.item(), images.size(0))
