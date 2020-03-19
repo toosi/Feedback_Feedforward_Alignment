@@ -121,6 +121,10 @@ parser.add_argument('--wdF', '--weight-decayF', default=1e-7, type=float,
 parser.add_argument('--wdB', '--weight-decayB', default=1e-7, type=float,
                     metavar='W', help='weight decay (default: 1e-5)',
                     dest='wdB')
+
+parser.add_argument('--gamma', default=1e-3, type=float,
+                    help='l2 on reconstruction activity  (default: 1e-3)',
+                    dest='gamma')                    
 parser.add_argument('--optimizerF', default='RMSprop', type=str,
                     help='optimizer for encoder')
 parser.add_argument('--optimizerB', default='RMSprop', type=str,
@@ -347,6 +351,8 @@ if len(args.loadinitialization):
     schedulerB_original = torch.load(loaddir+'schedulerB_original.pt')
     schedulerC_original = torch.load(loaddir+'schedulerC_original.pt')
 
+    # print(len(optimizerF_original['param_groups'][0]['params']))
+    # print(len(optimizerF.state_dict()['param_groups'][0]['params']))
         
     modelF.load_state_dict(modelF_nottrained)
     modelB.load_state_dict(modelB_nottrained)

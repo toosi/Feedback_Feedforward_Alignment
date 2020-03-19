@@ -589,6 +589,7 @@ def main_worker(gpu, ngpus_per_node, args):
         run_json_dict.update({'Train_corrd':Train_corrd_list})
         run_json_dict.update({'Train_lossd':Train_lossd_list})
         run_json_dict.update({'Train_lossl':Train_lossl_list})
+
         # evaluate on validation set
         _, _, test_results = validate(val_loader, modelF,modelB, criterione, criteriond, args, epoch)
         
@@ -602,6 +603,26 @@ def main_worker(gpu, ngpus_per_node, args):
         run_json_dict.update({'Test_corrd':Test_corrd_list})
         run_json_dict.update({'Test_lossd':Test_lossd_list})
         run_json_dict.update({'Test_lossl':Test_lossl_list})
+
+        # evaluate alignments
+        alignments_corrs =  {} 
+        alignments_ratios =  {}
+        for k in modelF.state_dict().keys():
+            if 'feedback' in k:
+                corrs = correlation(modelF.state_dict()[k.strip('_feedback')], modelF.state_dict()[k])
+                ratios = torch.norm(modelF.state_dict()[k.strip('_feedback')]).item()/torch.norm(modelF.state_dict()[k]).item() 
+                alignments_corrs.update({k.strip('_feedback'):corrs })
+                alignments_ratios.update({k.strip('_feedback'):ratios })
+        import pandas as pd
+        df_corr = pd.DataFrame.from_dict(alignments_corrs,orient='index', columns=[args.method])
+        df_corr.index.name = 'layer'
+        df_ratios= pd.DataFrame.from_dict(alignments_ratios,orient='index', columns=[ args.method])
+        df_ratios.index.name = 'layer'
+        print(df_ratios)
+
+        df_corr.to_csv(args.resultsdir+'df_corr_%s.csv'%args.runname, sep=',')
+        df_ratios.to_csv(args.resultsdir+'df_ratios_%s.csv'%args.runname, sep=',')
+
 
         # ---- adjust learning rates ----------
 
@@ -821,7 +842,9 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             reference = images
             reference = F.interpolate(reference, size=gener.shape[-1])
 
-            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+            # gamma = 10e-4
+
+            lossd = criteriond(gener, reference) + args.gamma * nn.MSELoss()(gener,torch.zeros_like(gener)) #+ criterione(modelF(pooled), target)
             # measure correlation and record loss
             pcorr = correlation(gener, reference)
             losses.update(lossd.item(), images.size(0))

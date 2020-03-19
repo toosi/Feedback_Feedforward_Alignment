@@ -26,9 +26,12 @@ parser.add_argument(
         '--config-file',
         dest='config_file',
         type=argparse.FileType(mode='r'))
+# parser.add_argument(
+#         '--eval_robust',
+#         dest='eval_robust',default=False)
 parser.add_argument(
-        '--eval_robust',
-        dest='eval_robust',default=False)
+        '--eval_swept_var',
+        dest='eval_swept_var',default='')
 parser.add_argument(
         '--eval_time',
         dest='eval_time',type=str)
@@ -84,24 +87,32 @@ if args.eval_RDMs:
         np.array(hf.get(layers[3]))]
         RDMs_dict.update({method:RDM_list}) 
 
-if args.eval_robust:
+if len(args.eval_swept_var):
+    if args.eval_swept_var=='sigma2':
+        non_swept_var='epsilon'
+        non_swept_var_value=0.0
+        swept_vars = np.arange(0, 1.1, 0.1).tolist() #[0, 0.2, 0.4, 0.6, 0.8, 1]
+    
+    print(swept_vars)
     sigma2 = 0.0
     maxitr = 4
     Test_acce = {}
-    epsilons = [0, 0.2, 0.4, 0.6, 0.8, 1]
+    # epsilons = [0, 0.2, 0.4, 0.6, 0.8, 1]
     existing_methods = []
     for method in  methods:
-        Test_acce_arr = np.zeros((4, 6))
-        for ie , epsilon in enumerate(epsilons):
+        Test_acce_arr = np.zeros((4, len(swept_vars)))
+        for iv , swept_var in enumerate(swept_vars):
             # json_name = '%s_%s_eval%s_maxitr4_epsilon%0.1e.json'%(args.runname, method, args.eval_time, epsilon)
-            json_name = '%s%s_%s_eval%s_maxitr%d_epsilon%0.1e_noisesigma2%s.json'%(args.databasedir,args.runname, method, args.eval_time, maxitr, epsilon, sigma2)
-
+            if args.eval_swept_var=='sigma2':
+                json_name = '%s%s_%s_eval%s_maxitr%d_epsilon%0.1e_noisesigma2%.1f.json'%(args.databasedir,args.runname, method, args.eval_time, maxitr, non_swept_var_value, swept_var)
+            else:
+                json_name = '%s%s_%s_eval%s_maxitr%d_epsilon%0.1e_noisesigma2%.1f.json'%(args.databasedir,args.runname, method, args.eval_time, maxitr, swept_var, sigma2)
             print(json_name)
             try:
                 with open(json_name, 'r') as fp:
                                 
                     results = json.load(fp)   
-                    Test_acce_arr[:, ie] = results['Test_acce']     
+                    Test_acce_arr[:, iv] = results['Test_acce']     
                     Test_acce.update({method:Test_acce_arr})
                 existing_methods.append(method)
             except FileNotFoundError:
@@ -234,7 +245,7 @@ if args.eval_RDMs:
     fig.savefig(args.resultsdir+'RDMs_comparisons_%s.pdf'%(args.runname), dpi=200)
     plt.clf()
 
-elif args.eval_robust:
+elif len(args.eval_swept_var):
     print(existing_methods)
     #------ accuracy ------------
     fig, axes = plt.subplots(nrows=1, ncols=4, figsize=[20,4])
@@ -242,17 +253,17 @@ elif args.eval_robust:
     for itr in range(4):
         for method in existing_methods:
             if itr == 3 :
-                axes[itr].plot(epsilons, Test_acce[method][itr], color=colors[method], label=method)
+                axes[itr].plot(swept_vars, Test_acce[method][itr], color=colors[method], label=method)
             else:
-                axes[itr].plot(epsilons, Test_acce[method][itr], color=colors[method])
+                axes[itr].plot(swept_vars, Test_acce[method][itr], color=colors[method])
 
-        axes[itr].set_xlabel('epsilon')
+        axes[itr].set_xlabel(args.eval_swept_var)
         axes[itr].set_ylabel('Discrimination accuracy: percent correct')
         axes[itr].set_title('itr = %d'%itr)
         axes[itr].set_ylim([0,100])
         
 
-        fig.suptitle('%s dataset %s eval%s sigma2=%s'%(args.dataset, args.runname, args.eval_time, sigma2))
+        fig.suptitle('%s dataset %s eval%s %s=%s'%(args.dataset, args.runname, args.eval_time, non_swept_var ,non_swept_var_value))
 
         # axes[1].set_xticks([])
         # axes[1].set_yticks([])
@@ -262,8 +273,8 @@ elif args.eval_robust:
 
     axes[3].legend()
 
-    fig.savefig(resultsdir+'robust_results_eval%s_sigma2_%s.pdf'%(args.eval_time, sigma2), dpi=200)
-    fig.savefig(resultsdir+'robust_results_eval%s_sigma2_%s.png'%(args.eval_time, sigma2), dpi=200)
+    fig.savefig(resultsdir+'robust_results_eval%s_%s_%s.pdf'%(args.eval_time, non_swept_var,non_swept_var_value), dpi=200)
+    fig.savefig(resultsdir+'robust_results_eval%s_%s_%s.png'%(args.eval_time, non_swept_var,non_swept_var_value), dpi=200)
 
     plt.clf()
 

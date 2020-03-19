@@ -96,7 +96,8 @@ parser.add_argument('--eval_generate_RDMs', type=bool, default=False,
                     help='save sample images')
 parser.add_argument('--eval_stimulation', type=bool, default=False, 
                     help='stimulate onehot')
-                    
+parser.add_argument('--eval_alignments', type=bool, default=False, 
+                    help='alignments of forward and backward weights')                   
 parser.add_argument('--eval_neural', type=str, default='', 
                     help='eval neural mapping not DONE!, e.g. hvmV0')
 
@@ -475,6 +476,11 @@ def main_worker(gpu, ngpus_per_node, args):
     Test_lossd_list = []
     
     assert (args.eval_sigma2==0) or (args.eval_epsilon == 0) or args.eval_generate_RDMs, 'Gaussian noise OR adversarial attack, choose one'
+
+    if args.eval_alignments:
+
+        alignments = evaluate_alignments(modelF, modelB, args)
+        
     
     if args.eval_stimulation:
 
@@ -770,6 +776,44 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
     return modelF, modelB, [top1.avg, corr.avg, losses.avg]
 
 
+def evaluate_alignments(modelF, modelB,  args):
+
+    # switch to evaluate mode
+    modelF.eval()
+    modelB.eval()
+
+    alignments_corrs =  {} 
+    alignments_ratios =  {}
+    for k in modelF.state_dict().keys():
+       if 'feedback' in k:
+           corrs = correlation(modelF.state_dict()[k.strip('_feedback')], modelF.state_dict()[k])
+           ratios = torch.norm(modelF.state_dict()[k.strip('_feedback')]).item()/torch.norm(modelF.state_dict()[k]).item() 
+           alignments_corrs.update({k.strip('_feedback'):corrs })
+           alignments_ratios.update({k.strip('_feedback'):ratios })
+    import pandas as pd
+    df_corr = pd.DataFrame.from_dict(alignments_corrs,orient='index', columns=[args.method])
+    df_corr.index.name = 'layer'
+    df_ratios= pd.DataFrame.from_dict(alignments_ratios,orient='index', columns=[ args.method])
+    df_ratios.index.name = 'layer'
+    print(df_corr)
+    if os.path.exists(args.resultsdir+'df_corr_%s.csv'%args.runname):
+        #read previous 
+        df_corr_previous = pd.read_csv(args.resultsdir+'df_corr_%s.csv'%args.runname)
+        df_ratios_previous = pd.read_csv(args.resultsdir+'df_ratios_%s.csv'%args.runname)
+
+        print('previously', df_corr_previous)
+        print('combined',pd.merge(df_corr_previous,df_corr, on='layer'))
+
+        df_corr = pd.merge(df_corr_previous,df_corr, on='layer')
+        df_ratios = pd.merge(df_ratios_previous, df_ratios, on='layer')
+
+        df_corr = df_corr.loc[:, ~df_corr.columns.str.contains('^Unnamed')]
+        df_ratios = df_ratios.loc[:, ~df_ratios.columns.str.contains('^Unnamed')]
+
+    df_corr.to_csv(args.resultsdir+'df_corr_%s.csv'%args.runname, sep=',')
+    df_ratios.to_csv(args.resultsdir+'df_ratios_%s.csv'%args.runname, sep=',')
+    # print(alignments)
+    return alignments_corrs
 
 
 # FGSM attack code from pytorch tutorial
