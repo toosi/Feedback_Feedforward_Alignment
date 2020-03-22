@@ -308,16 +308,28 @@ if 'fixup' in args.arche:
             weight_decay=args.wdF)
 
 else:
-    # dict_params_first = {'params':['module.conv1.weight'], 'weight_decay':1e-1}
-    # dict_params_last = {'params':['module.conv2.weight'], 'weight_decay':1e-6}
-    # dict_params_middle = {'params':[p for p in list(modelF.parameters()) if p not in ['module.conv1.weight','module.conv2.weight']]}
-    list_paramsF = modelF.parameters() #[dict_params_first, dict_params_middle, dict_params_last]
+    # ict_params_firstF = {'params':[p for n,p in list(modelF.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-4}
+    # dict_params_lastF = {'params':[p for n,p in list(modelF.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-4}
+    # dict_params_middleF = {'params':[p for n,p in list(modelF.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
+    # list_paramsF = [dict_params_firstF, dict_params_middleF, dict_params_lastF]
+
+    # dict_params_firstC = {'params':[p for n,p in list(modelC.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-4}
+    # dict_params_lastC = {'params':[p for n,p in list(modelC.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-4}
+    # dict_params_middleC = {'params':[p for n,p in list(modelC.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
+    # list_paramsC = [dict_params_firstC, dict_params_middleC, dict_params_lastC]
+
+
+    # dict_params_firstB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-3}
+    # dict_params_lastB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-3}
+    # dict_params_middleB = {'params':[p for n,p in list(modelB.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
+    # list_paramsB = [dict_params_firstB, dict_params_middleB, dict_params_lastB]
+
     if 'Adam' in args.optimizerF:
-        optimizerF = getattr(optim, args.optimizerF)(list_paramsF,  lr=args.lrF, weight_decay=args.wdF)
-        optimizerC = getattr(optim, args.optimizerF)(list_paramsF,  lr=args.lrF, weight_decay=args.wdF)
+        optimizerF = getattr(optim, args.optimizerF)(modelF.parameters(),  lr=args.lrF, weight_decay=args.wdF)
+        optimizerC = getattr(optim, args.optimizerF)(modelC.parameters(),  lr=args.lrF, weight_decay=args.wdF)
     else:
-        optimizerF = getattr(optim, args.optimizerF)(list_paramsF,  lr=args.lrF, weight_decay=args.wdF, momentum=args.momentum)
-        optimizerC = getattr(optim, args.optimizerF)(list_paramsF,  lr=args.lrF, weight_decay=args.wdF, momentum=args.momentum)
+        optimizerF = getattr(optim, args.optimizerF)(modelF.parameters(),  lr=args.lrF, weight_decay=args.wdF, momentum=args.momentum)
+        optimizerC = getattr(optim, args.optimizerF)(modelC.parameters(),  lr=args.lrF, weight_decay=args.wdF, momentum=args.momentum)
     if 'Adam' in args.optimizerB:
         optimizerB = getattr(optim, args.optimizerB)(modelB.parameters(),  lr=args.lrB, weight_decay=args.wdB)
     else:

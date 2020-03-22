@@ -341,6 +341,16 @@ def main_worker(gpu, ngpus_per_node, args):
             optimizerF3 = getattr(torch.optim,args.optimizerF)(list(modelF.parameters()), args.lrF,
                         weight_decay=args.wdF)
         else:
+            # dict_params_firstF = {'params':[p for n,p in list(modelF.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-1}
+            # dict_params_lastF = {'params':[p for n,p in list(modelF.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-6}
+            # dict_params_middleF = {'params':[p for n,p in list(modelF.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
+            # list_paramsF = [dict_params_firstF, dict_params_middleF, dict_params_lastF]
+
+            # dict_params_firstB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-4}
+            # dict_params_lastB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-6}
+            # dict_params_middleB = {'params':[p for n,p in list(modelB.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
+            # list_paramsB = [dict_params_firstB, dict_params_middleB, dict_params_lastB]
+
             optimizerF = getattr(torch.optim,args.optimizerF)(list(modelF.parameters()), args.lrF,
                                     momentum=args.momentum,
                                     weight_decay=args.wdF)

@@ -1,9 +1,9 @@
 #!/bin/sh
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
-#SBATCH -c 20
-#SBATCH --gres=gpu:4
-#SBATCH --mem=40gb
+#SBATCH -c 48
+#SBATCH --gres=gpu:8
+#SBATCH --mem=180gb
 # *#SBATCH --array=0-2
 #SBATCH --time=5-00:00:00
 
@@ -20,7 +20,7 @@ module load anaconda3-2019.03
 source activate /home/tt2684/conda-envs/pytorch_tensorflow_latest
 
 now=$(date +'%Y-%m-%d_%H-%M')
-note='**Activity_minimization_on_reconstruction**'
+note='**SL_imagenet**'
 # imagenet_with_modified_resnets_wobn1_trackFalse_wolastAcc
 # Cycle_Consistency AdvTrainingFGSM_epsilon0.2_withOUTSperateOptimizerscheduler
 # AdvTrainingFGSM_epsilon0.2_withscheduler
@@ -33,7 +33,7 @@ printf "********************************************************** \n"
 ####Command to execute Python program
 config=0
 init=Feb14-09-08_CIFAR10_a3e0466f41_592 # use: -loadinitialization $init
-python -u create_config.py -dataset imagenet  -j 4 --input_size 224  --batch-size 256 --epoch 500 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-1 --lrB 1e-3 --wdF 1e-4 --wdB 1e-6 --patiencee 10 --patienced 8 -p 100 --note  $note ; config=1  #
+# python -u create_config.py -dataset imagenet  -j 4 --input_size 224  --batch-size 256 --epoch 500 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-1 --lrB 1e-3 --wdF 1e-4 --wdB 1e-6 --patiencee 10 --patienced 8 -p 100 --note  $note ; config=1  #
 # python -u create_config.py -dataset CIFAR10  -j 4  --gamma 1  --input_size 32 --base_channels 64 --batch-size 256 --epoch 500 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 # python -u create_config.py -dataset MNIST  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 150 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
@@ -42,7 +42,7 @@ python -u create_config.py -dataset imagenet  -j 4 --input_size 224  --batch-siz
 
 if [ $config == 0 ]
   then
-  runname='Mar19-12-11_CIFAR10_3c7b30b20d_636' # 'Feb14-09-08_CIFAR10_a3e0466f41_592'  #
+  runname='Mar22-09-23_imagenet_be6d602bd1_59' # 'Feb14-09-08_CIFAR10_a3e0466f41_592'  #
   configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
   methods=('SLVanilla') # 'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
   # methods=('SLAdvImgCC0' 'SLAdvCostCC0' 'BPCC0' 'FACC0' 'SLVanillaCC0' 'SLErrorCC0' )
