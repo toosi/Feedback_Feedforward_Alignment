@@ -312,28 +312,33 @@ else:
     # dict_params_lastF = {'params':[p for n,p in list(modelF.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-4}
     # dict_params_middleF = {'params':[p for n,p in list(modelF.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
     # list_paramsF = [dict_params_firstF, dict_params_middleF, dict_params_lastF]
+#     list_paramsF = [p for p in list(modelF.parameters()) if p.requires_grad==True]
+    list_paramsF = [p for n,p in list(modelF.named_parameters()) if 'feedback' not in n]
 
     # dict_params_firstC = {'params':[p for n,p in list(modelC.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-4}
     # dict_params_lastC = {'params':[p for n,p in list(modelC.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-4}
     # dict_params_middleC = {'params':[p for n,p in list(modelC.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
     # list_paramsC = [dict_params_firstC, dict_params_middleC, dict_params_lastC]
-
+#     list_paramsC = [p for p in list(modelC.parameters()) if p.requires_grad==True]
+    list_paramsC = [p for n,p in list(modelC.named_parameters()) if 'feedback' not in n]
 
     # dict_params_firstB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-3}
     # dict_params_lastB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-3}
     # dict_params_middleB = {'params':[p for n,p in list(modelB.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
     # list_paramsB = [dict_params_firstB, dict_params_middleB, dict_params_lastB]
+#     list_paramsB = [p for p in list(modelB.parameters()) if p.requires_grad==True]
+    list_paramsB = [p for n,p in list(modelB.named_parameters()) if 'feedback' not in n]
 
     if 'Adam' in args.optimizerF:
-        optimizerF = getattr(optim, args.optimizerF)(modelF.parameters(),  lr=args.lrF, weight_decay=args.wdF)
-        optimizerC = getattr(optim, args.optimizerF)(modelC.parameters(),  lr=args.lrF, weight_decay=args.wdF)
+        optimizerF = getattr(optim, args.optimizerF)(list_paramsF,  lr=args.lrF, weight_decay=args.wdF)
+        optimizerC = getattr(optim, args.optimizerF)(list_paramsC,  lr=args.lrF, weight_decay=args.wdF)
     else:
-        optimizerF = getattr(optim, args.optimizerF)(modelF.parameters(),  lr=args.lrF, weight_decay=args.wdF, momentum=args.momentum)
-        optimizerC = getattr(optim, args.optimizerF)(modelC.parameters(),  lr=args.lrF, weight_decay=args.wdF, momentum=args.momentum)
+        optimizerF = getattr(optim, args.optimizerF)(list_paramsF,  lr=args.lrF, weight_decay=args.wdF, momentum=args.momentum)
+        optimizerC = getattr(optim, args.optimizerF)(list_paramsC,  lr=args.lrF, weight_decay=args.wdF, momentum=args.momentum)
     if 'Adam' in args.optimizerB:
-        optimizerB = getattr(optim, args.optimizerB)(modelB.parameters(),  lr=args.lrB, weight_decay=args.wdB)
+        optimizerB = getattr(optim, args.optimizerB)(list_paramsB,  lr=args.lrB, weight_decay=args.wdB)
     else:
-        optimizerB = getattr(optim, args.optimizerB)(modelB.parameters(),  lr=args.lrB, weight_decay=args.wdB, momentum=args.momentum)
+        optimizerB = getattr(optim, args.optimizerB)(list_paramsB,  lr=args.lrB, weight_decay=args.wdB, momentum=args.momentum)
 
 # schedulerF = optim.lr_scheduler.MultiStepLR(optimizerF, np.arange(0, args.epochs, args.step),args.drop)
 # schedulerB = optim.lr_scheduler.MultiStepLR(optimizerB, np.arange(args.offset, args.epochs, args.step),args.drop)

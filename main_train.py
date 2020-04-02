@@ -96,7 +96,7 @@ writer = SummaryWriter(log_dir=args.tensorboarddir)
 
 
 if 'AsymResLNet' in args.arche:
-    toggle_state_dict = state_dict_utils.toggle_state_dict
+    toggle_state_dict = state_dict_utils.toggle_state_dict_normalize
     from models import custom_models_ResNetLraveled as custom_models
 
 elif 'asymresnet' in args.arche:
@@ -334,37 +334,43 @@ def main_worker(gpu, ngpus_per_node, args):
                 weight_decay=args.wdB) 
 
     else:
+        # ict_params_firstF = {'params':[p for n,p in list(modelF.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-4}
+        # dict_params_lastF = {'params':[p for n,p in list(modelF.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-4}
+        # dict_params_middleF = {'params':[p for n,p in list(modelF.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
+        # list_paramsF = [dict_params_firstF, dict_params_middleF, dict_params_lastF]
+        # list_paramsF = [p for p in list(modelF.parameters()) if p.requires_grad==True]
+        list_paramsF = [p for n,p in list(modelF.named_parameters()) if 'feedback' not in n]
+
+        # dict_params_firstB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-3}
+        # dict_params_lastB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-3}
+        # dict_params_middleB = {'params':[p for n,p in list(modelB.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
+        # list_paramsB = [dict_params_firstB, dict_params_middleB, dict_params_lastB]
+        # list_paramsB = [p for p in list(modelB.parameters()) if p.requires_grad==True]
+        list_paramsB = [p for n,p in list(modelB.named_parameters()) if 'feedback' not in n]
+
         if 'Adam' in args.optimizerF:
 
-            optimizerF = getattr(torch.optim,args.optimizerF)(list(modelF.parameters()), args.lrF,
+            optimizerF = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
                         weight_decay=args.wdF)
-            optimizerF3 = getattr(torch.optim,args.optimizerF)(list(modelF.parameters()), args.lrF,
+            optimizerF3 = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
                         weight_decay=args.wdF)
         else:
-            # dict_params_firstF = {'params':[p for n,p in list(modelF.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-1}
-            # dict_params_lastF = {'params':[p for n,p in list(modelF.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-6}
-            # dict_params_middleF = {'params':[p for n,p in list(modelF.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
-            # list_paramsF = [dict_params_firstF, dict_params_middleF, dict_params_lastF]
-
-            # dict_params_firstB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-4}
-            # dict_params_lastB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-6}
-            # dict_params_middleB = {'params':[p for n,p in list(modelB.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
-            # list_paramsB = [dict_params_firstB, dict_params_middleB, dict_params_lastB]
-
-            optimizerF = getattr(torch.optim,args.optimizerF)(list(modelF.parameters()), args.lrF,
+            
+            optimizerF = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
                                     momentum=args.momentum,
-                                    weight_decay=args.wdF)
-            optimizerF3 = getattr(torch.optim,args.optimizerF)(list(modelF.parameters()), args.lrF,
+                                    weight_decay=args.wdF,
+                                    )
+            optimizerF3 = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
                         momentum=args.momentum,
                         weight_decay=args.wdF)
 
         if 'Adam' in args.optimizerB:                       
 
-            optimizerB = getattr(torch.optim,args.optimizerB)(modelB.parameters(), args.lrB,
+            optimizerB = getattr(torch.optim,args.optimizerB)(list_paramsB, args.lrB,
                                         
                                         weight_decay=args.wdB) 
         else:
-            optimizerB = getattr(torch.optim,args.optimizerB)(modelB.parameters(), args.lrB,
+            optimizerB = getattr(torch.optim,args.optimizerB)(list_paramsB, args.lrB,
                                 momentum=args.momentum,
                                 weight_decay=args.wdB)
     
@@ -574,18 +580,24 @@ def main_worker(gpu, ngpus_per_node, args):
 
     lrF_list = []
 
+    Alignments_corrs_first_layer_list =  [] 
+    Alignments_corrs_last_layer_list =  []
+
+    Forward_norm_first_layer_list =  []
+    Forward_norm_last_layer_list =  []
+
+    Alignments_ratios_first_layer_list =  []
+    Alignments_ratios_last_layer_list =  []
+
     for epoch in range(args.start_epoch, args.epochs):
 
         if args.distributed:
-        
             train_sampler.set_epoch(epoch)
-
-     
+    
         for param_group in optimizerF.param_groups:
             lrF = param_group['lr'] 
         lrF_list.extend([lrF])
         run_json_dict.update({'lrF':lrF_list})
-
 
         print('*****  lrF=%1e'%(lrF))
         
@@ -609,29 +621,49 @@ def main_worker(gpu, ngpus_per_node, args):
         Test_corrd_list.extend([round(test_results[1],3)])
         Test_lossd_list.extend([test_results[2]])
         Test_lossl_list.extend([test_results[3]])
+
         run_json_dict.update({'Test_acce':Test_acce_list})
         run_json_dict.update({'Test_corrd':Test_corrd_list})
         run_json_dict.update({'Test_lossd':Test_lossd_list})
         run_json_dict.update({'Test_lossl':Test_lossl_list})
 
         # evaluate alignments
-        alignments_corrs =  {} 
-        alignments_ratios =  {}
-        for k in modelF.state_dict().keys():
-            if 'feedback' in k:
-                corrs = correlation(modelF.state_dict()[k.strip('_feedback')], modelF.state_dict()[k])
-                ratios = torch.norm(modelF.state_dict()[k.strip('_feedback')]).item()/torch.norm(modelF.state_dict()[k]).item() 
-                alignments_corrs.update({k.strip('_feedback'):corrs })
-                alignments_ratios.update({k.strip('_feedback'):ratios })
-        import pandas as pd
-        df_corr = pd.DataFrame.from_dict(alignments_corrs,orient='index', columns=[args.method])
-        df_corr.index.name = 'layer'
-        df_ratios= pd.DataFrame.from_dict(alignments_ratios,orient='index', columns=[ args.method])
-        df_ratios.index.name = 'layer'
-        print(df_ratios)
+        list_WF = [k for k in modelF.state_dict().keys() if 'feedback' in k]
+        first_layer_key = list_WF[0]
+        last_layer_key = list_WF[-1]
 
-        df_corr.to_csv(args.resultsdir+'df_corr_%s.csv'%args.runname, sep=',')
-        df_ratios.to_csv(args.resultsdir+'df_ratios_%s.csv'%args.runname, sep=',')
+        corrs_first_layer = correlation(modelF.state_dict()[first_layer_key.strip('_feedback')], modelF.state_dict()[first_layer_key])
+        ratios_first_layer = torch.norm(modelF.state_dict()[first_layer_key.strip('_feedback')]).item()/torch.norm(modelF.state_dict()[first_layer_key]).item() 
+
+        corrs_last_layer = correlation(modelF.state_dict()[last_layer_key.strip('_feedback')], modelF.state_dict()[last_layer_key])
+        ratios_last_layer = torch.norm(modelF.state_dict()[last_layer_key.strip('_feedback')]).item()/torch.norm(modelF.state_dict()[last_layer_key]).item() 
+
+        norm_first_layer = torch.norm(modelF.state_dict()[first_layer_key.strip('_feedback')]).item()
+        norm_last_layer = torch.norm(modelF.state_dict()[first_layer_key.strip('_feedback')]).item()
+
+        norm_first_layer_back = torch.norm(modelF.state_dict()[first_layer_key]).item()
+        norm_last_layer_back = torch.norm(modelF.state_dict()[first_layer_key]).item()
+
+
+        Alignments_corrs_first_layer_list.extend([round(corrs_first_layer, 3)])
+        Alignments_corrs_last_layer_list.extend([round(corrs_last_layer, 3)])
+        
+        Alignments_ratios_first_layer_list.extend([round(ratios_first_layer, 3)])
+        Alignments_ratios_last_layer_list.extend([round(ratios_last_layer, 3)])
+        
+        Forward_norm_first_layer_list.extend([round(norm_first_layer, 3)])
+        Forward_norm_last_layer_list.extend([round(norm_last_layer, 3)])
+        
+        
+        run_json_dict.update({'Alignments_corrs_first_layer':Alignments_corrs_first_layer_list})
+        run_json_dict.update({'Alignments_corrs_last_layer':Alignments_corrs_last_layer_list})
+        
+        run_json_dict.update({'Alignments_ratios_first_layer':Alignments_ratios_first_layer_list})
+        run_json_dict.update({'Alignments_ratios_last_layer':Alignments_ratios_last_layer_list})
+
+        
+        run_json_dict.update({'Forward_norm_first_layer':Forward_norm_first_layer_list})
+        run_json_dict.update({'Forward_norm_last_layer':Forward_norm_last_layer_list})
 
 
         # ---- adjust learning rates ----------
@@ -831,6 +863,8 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         losse.backward()
         optimizerF.step()
         #schedulerF.step()
+        if args.method == 'BP':
+            modelF.load_state_dict(toggle_state_dict_YYtoBP(modelF.state_dict(), modelF.state_dict()))
 
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))

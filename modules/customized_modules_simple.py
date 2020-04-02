@@ -6,7 +6,8 @@ from torch.nn import init
 import copy
 from torch.nn.parameter import Parameter
 from torch.nn.modules.utils import _single, _pair
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+
 def linear_fa_backward_hook(module, grad_input, grad_output):
     if grad_input[1] is not None:
         grad_input_fa = grad_output[0].mm(module.weight_feedback)
@@ -80,8 +81,10 @@ class LinearModule(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.weight = Parameter(torch.Tensor(out_features, in_features))
-        if algorithm == 'BP':
-            self.weight_feedback = copy.deepcopy(self.weight).clone()
+        self.algorithm = algorithm
+
+        if self.algorithm == 'BP':
+            self.weight_feedback = copy.deepcopy(self.weight) #.clone()
         else:
             self.weight_feedback = Parameter(torch.FloatTensor(out_features, in_features), requires_grad=False)
         if bias:
@@ -90,9 +93,14 @@ class LinearModule(nn.Module):
             self.register_parameter('bias', None)
         self.reset_parameters()
         self.register_backward_hook(linear_fa_backward_hook)
+
     def reset_parameters(self):
         init.kaiming_uniform_(self.weight, a=math.sqrt(5))
-        init.kaiming_uniform_(self.weight_feedback, a=math.sqrt(5))
+        if self.algorithm == 'FA':
+            init.kaiming_uniform_(self.weight_feedback, a=math.sqrt(5))
+        elif self.algorithm == 'BP':
+            self.weight_feedback = copy.deepcopy(self.weight)
+
         if self.bias is not None:
             fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
             bound = 1 / math.sqrt(fan_in)
@@ -131,35 +139,42 @@ class _ConvNdFA(nn.Module):
         self.output_padding = output_padding
         self.groups = groups
         self.padding_mode = padding_mode
+        self.algorithm = algorithm
         if transposed:
             self.weight = Parameter(torch.Tensor(
                 in_channels, out_channels // groups, *kernel_size))
-            if algorithm == 'BP':
-                self.weight_feedback = copy.deepcopy(self.weight)
-            else:
 
-                self.weight_feedback = Parameter(torch.Tensor(
-                    in_channels, out_channels // groups, *kernel_size), requires_grad=False)
+            self.weight_feedback = Parameter(torch.Tensor(
+                in_channels, out_channels // groups, *kernel_size), requires_grad=False)
         else:
             self.weight = Parameter(torch.Tensor(
                 out_channels, in_channels // groups, *kernel_size))
-            if algorithm == 'BP':
-                self.weight_feedback = copy.deepcopy(self.weight)
-            else:
-                self.weight_feedback = Parameter(torch.Tensor(
+
+            self.weight_feedback = Parameter(torch.Tensor(
                 out_channels, in_channels // groups, *kernel_size), requires_grad=False)
+        
+        if self.algorithm == 'BP':
+            self.weight_feedback = copy.deepcopy(self.weight)
+            
+            
         if bias:
             self.bias = Parameter(torch.Tensor(out_channels))
         else:
             self.register_parameter('bias', None)
         self.reset_parameters()
+        
     def reset_parameters(self):
         init.kaiming_uniform_(self.weight, a=math.sqrt(5))
-        init.kaiming_uniform_(self.weight_feedback, a=math.sqrt(5))
+        if self.algorithm == 'FA':
+            init.kaiming_uniform_(self.weight_feedback, a=math.sqrt(5))
+        elif self.algorithm == 'BP':
+            self.weight_feedback = copy.deepcopy(self.weight)
+
         if self.bias is not None:
             fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
             bound = 1 / math.sqrt(fan_in)
             init.uniform_(self.bias, -bound, bound)
+
     def extra_repr(self):
         s = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'
              ', stride={stride}')
@@ -189,12 +204,14 @@ class AsymmetricFeedbackConv2d(_ConvNdFA):
         stride = _pair(stride)
         padding = _pair(padding)
         dilation = _pair(dilation)
+        self.algorithm = algorithm
         super(AsymmetricFeedbackConv2d, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
             transposed=False, output_padding=_pair(0), groups=groups, bias=bias, padding_mode=padding_mode, algorithm=algorithm)
-        if algorithm == 'FA':
+        if self.algorithm == 'FA':
             self.register_backward_hook(conv2d_fa_backward_hook)
     def forward(self, input):
+         
         if self.padding_mode == 'circular':
             expanded_padding = ((self.padding[1] + 1) // 2, self.padding[1] // 2,
                                 (self.padding[0] + 1) // 2, self.padding[0] // 2)

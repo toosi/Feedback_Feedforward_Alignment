@@ -63,6 +63,58 @@ def toggle_state_dict(state_dict):
     return new_state_dict
 
 
+def toggle_state_dict_normalize(state_dict):
+    # this code copies the forward parameters to the backward parameters and vice versa
+    # additionally it normalizes both the forward and backward path 
+
+    new_state_dict = {}
+    already_added = []
+
+    for ik, k  in enumerate(state_dict.keys()):
+
+        item = state_dict[k]
+
+        if ('bn' not in k) and ('weight' in k) and ('fc' not in k):
+
+            if k not in already_added:
+                
+
+                if 'feedback' not in k:
+                    item_dual = state_dict[k+'_feedback']
+                    if 'upsample' in k:
+                        k = k.replace('up','down')
+                    elif 'downsample' in k:
+                        k = k.replace('down', 'up')
+
+                    new_state_dict.update({k+'_feedback':item})
+                    new_state_dict.update({k:item_dual})
+
+                else:
+                    item_dual = state_dict[k.split('_')[0]]
+                    if 'upsample' in k:
+                        k = k.replace('up','down')
+                    elif 'downsample' in k:
+                        k = k.replace('down', 'up')
+                        
+                    denom_item = 1#torch.sqrt(torch.abs(item)**2+torch.abs(item_dual)**2)
+                    denom_item_dual = 1#torch.sqrt(torch.abs(item)**2+torch.abs(item_dual)**2)
+                    
+                    new_state_dict.update({k.split('_')[0]:item/denom_item })
+                    new_state_dict.update({k:item_dual/denom_item_dual})
+
+        elif ('fc'in k) and ('weight' in k):
+            if 'feedback' in k:
+                new_state_dict.update({k.strip('_feedback'): torch.transpose(item, 0, 1)})
+            else:
+                new_state_dict.update({k+'_feedback': torch.transpose(item, 0, 1)})
+                
+        else:
+            new_state_dict.update({k:item})
+
+        already_added.append(k)
+
+    return new_state_dict
+
 def toggle_state_dict_resnets(state_dict, state_dict_dest):
 
     """
@@ -292,7 +344,9 @@ def toggle_state_dict_BPtoYY(state_dict_BP, state_dict_YY):
 
 def toggle_state_dict_YYtoBP(state_dict_YY, state_dict_BP):
 
-    """ copies the forward of a YY net to forward of the BP net """
+    """ copies the forward of a YY net to forward of the BP net
+        and the backward of BP
+    """
 
     new_state_dict = copy.deepcopy(state_dict_BP)
 
@@ -302,6 +356,8 @@ def toggle_state_dict_YYtoBP(state_dict_YY, state_dict_BP):
 
         if 'feedback' not in k:
             new_state_dict.update({k:item})
+            if ('weight' in k) and ('bn' not in k):
+                new_state_dict.update({k+'_feedback':item})
 
     return new_state_dict
 
