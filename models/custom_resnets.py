@@ -11,7 +11,8 @@ needs state_dict_utils.toggle_state_dict_resnets to toggle the weights in SL
 
 import torch
 import torch.nn as nn
-from modules import customized_modules_simple as customized_modules
+# from modules import customized_modules_simple as customized_modules
+from modules import customized_modules_layerwise as customized_modules
 try:
     from torch.hub import load_state_dict_from_url
 except ImportError:
@@ -75,7 +76,7 @@ class BasicBlock(nn.Module):
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(inplanes, planes, stride, bias=False, algorithm=algorithm)
         # self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.conv2 = conv3x3(planes, planes, bias=False, algorithm=algorithm)
         self.bn2 = norm_layer(planes, track_running_stats=False)
         self.downsample = downsample
@@ -117,7 +118,7 @@ class Bottleneck(nn.Module):
         self.bn2 = norm_layer(width)
         self.conv3 = conv1x1(width, planes * self.expansion, bias=False, algorithm=algorithm)
         self.bn3 = norm_layer(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.downsample = downsample
         self.stride = stride
 
@@ -168,7 +169,7 @@ class AsymResNet(nn.Module):
         self.conv1 = Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1,
                                bias=False, algorithm=algorithm)
         self.bn1 = norm_layer(self.inplanes, track_running_stats=False)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0], algorithm=algorithm)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
@@ -399,7 +400,7 @@ class BasicBlockT(nn.Module):
         # Both self.conv1 and self.upsample layers upsample the input when stride != 1
         self.conv1 = convT3x3(planes, inplanes,  stride, bias=False, algorithm=algorithm)
         # self.bn1 = norm_layer(inplanes, track_running_stats=False)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.conv2 = convT3x3(planes, planes, bias=False, algorithm=algorithm)
         self.bn2 = norm_layer(planes, track_running_stats=False)
         self.upsample = upsample
@@ -441,7 +442,7 @@ class BottleneckT(nn.Module):
         self.bn2 = norm_layer(width, track_running_stats=False)
         self.conv3 = convT1x1(width, planes * self.expansion, bias=False, algorithm=algorithm)
         self.bn3 = norm_layer(planes * self.expansion, track_running_stats=False)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.upsample = upsample
         self.stride = stride
 
@@ -499,7 +500,7 @@ class AsymResNetT(nn.Module):
         self.layer2 = self._make_layer(block, 64, layers[1], stride=2,
                                        dilate=replace_stride_with_dilation[0], algorithm=algorithm)
         self.layer1 = self._make_layer(block, 64, layers[0], algorithm=algorithm)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.bn1 = norm_layer(self.inplanes, track_running_stats=False)
         self.conv1 = ConvTranspose2d(self.inplanes, 3, kernel_size=3, stride=1, padding=1,
                                bias=False, algorithm=algorithm)

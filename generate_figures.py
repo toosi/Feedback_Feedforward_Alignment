@@ -46,6 +46,7 @@ if args.config_file:
     arg_dict = args.__dict__
     for key, value in data.items():
         setattr(args, key, value)
+
 print(args.resultsdir.split('/Research')[1])
 
 if not(hasattr(args, 'databasedir')):
@@ -55,14 +56,14 @@ if not(hasattr(args, 'databasedir')):
 
 
 
-base_methods = ['BP', 'FA', 'SLVanilla', 'SLError', 'SLAdvImg', 'SLAdvCost','SLConv1', 'SLGrConv1', 'SLLatentRobust']
+base_methods = ['BP', 'FA', 'SLVanilla', 'SLError', 'SLAdvImg', 'SLAdvCost','SLConv1', 'SLGrConv1', 'SLLatentRobust','IA']
 all_methods = copy.deepcopy(base_methods)
 
 print(base_methods)
 [all_methods.extend([m+'CC0'] )for m in base_methods]
 [all_methods.extend([m+'CC1'] )for m in base_methods]
 print(all_methods)
-colors = {'BP':'k', 'FA':'indigo', 'SLVanilla':'firebrick','SLError':'navy', 'SLAdvImg':'c','SLAdvCost':'darkolivegreen','SLLatentRobust':'yellow',
+colors = {'BP':'k', 'FA':'indigo', 'SLVanilla':'firebrick','SLError':'navy', 'SLAdvImg':'c','SLAdvCost':'darkolivegreen','SLLatentRobust':'yellow','IA':'orange',
                'BPCC0':'dimgrey', 'FACC0':'blueviolet', 'SLVanillaCC0':'r','SLErrorCC0':'blue', 'SLAdvImgCC0':'c','SLAdvCostCC0':'green','SLLatentRobustCC0':'khaki',
                'BPCC1':'lightgrey', 'FACC1':'mediumpurple', 'SLVanillaCC1':'salmon','SLErrorCC1':'lightsteelblue', 'SLAdvImgCC1':'c','SLAdvCostCC1':'lightgreen','SLLatentRobustCC1':'darkgoldenrod',
                'SLConv1':'sandybrown', 'SLGrConv1':'brown' }
@@ -127,6 +128,16 @@ else:
     Train_lossl = {}
     Test_corrd = {}
     Train_corrd = {}
+    Learning_rate = {}
+    
+    Align_corr_first = {}
+    Align_corr_last = {}
+    
+    Align_ratios_first = {}
+    Align_ratios_last = {}
+    
+    Forward_norm_first = {}
+    Forward_norm_last = {}
 
     existing_methods = []
     for method in  methods:
@@ -146,6 +157,19 @@ else:
 
                 Test_corrd.update({method:results['Test_corrd']})
                 Train_corrd.update({method:results['Train_corrd']})
+
+                                
+                Learning_rate.update({method:results['lrF']})
+                
+                Align_corr_first.update({method:results['Alignments_corrs_first_layer']})
+                Align_corr_last.update({method:results['Alignments_corrs_last_layer']})
+                
+                Align_ratios_first.update({method:results['Alignments_ratios_first_layer']})
+                Align_ratios_last.update({method:results['Alignments_ratios_last_layer']})
+                
+                Forward_norm_first.update({method:results['Forward_norm_first_layer']})
+                Forward_norm_last.update({method:results['Forward_norm_last_layer']})
+
             existing_methods.append(method)
         except FileNotFoundError:
             print('%s%s_%s.json was not found'%(args.databasedir,args.runname, method))
@@ -386,5 +410,64 @@ else:
 
     plt.clf()
 
+    #------ Alignment ------------
+    fig, axes = plt.subplots(nrows=3, ncols=2, figsize=[10,12])
+
+    for method in existing_methods:
 
 
+        axes[0,0].plot(Align_corr_first[method], color=colors[method], ls='--',label=method)
+        axes[0,1].plot(Align_corr_last[method], color=colors[method], ls='--',label=method)
+        
+        axes[1,0].plot(180*np.arccos(np.array(Align_corr_first[method]))/np.pi, color=colors[method], ls='--',label=method)
+        axes[1,1].plot(180*np.arccos(np.array(Align_corr_last[method]))/np.pi, color=colors[method], ls='--',label=method)
+
+        axes[2,0].plot(Align_ratios_first[method], color=colors[method], ls='--',label=method)
+        axes[2,1].plot(Align_ratios_last[method], color=colors[method], ls='--',label=method)
+
+    axes[0,0].set_ylabel('Correlation F&B weights')
+    axes[1,0].set_ylabel('Angles between F&B (degrees)')
+    axes[2,0].set_ylabel('Ratio of Norms: F/B')
+
+    axes[0,0].set_ylim([0,1.01])
+    axes[0,1].set_ylim([0,1.01])
+    axes[1,0].set_ylim([-1,91])
+    axes[1,1].set_ylim([-1,91])
+
+    axes[1,0].set_yticks([0,45,90])
+    axes[1,1].set_yticks([0,45,90])
+
+    axes[1,1].legend()
+
+    axes[2,0].set_xlabel('epoch')
+    axes[2,1].set_xlabel('epoch')
+
+    axes[0,0].set_title('First layer')
+    axes[0,1].set_title('Last layer')
+
+    axes[1,0].set_xticks([])
+    axes[1,0].set_yticks([])
+
+    fig.suptitle('%s dataset %s '%(args.dataset, args.runname), y=0.92)
+
+    fig.savefig(resultsdir+'Alignment_results_%depochs.pdf'%args.epochs, dpi=200)
+    fig.savefig(resultsdir+'Alignment_results_%depochs.png'%args.epochs, dpi=200)
+
+    plt.clf()
+
+    #------ Leaarning rate ------------
+    fig, axes = plt.subplots(nrows=1, ncols=1, figsize=[8,4])
+
+    for method in existing_methods:
+        axes.plot(Learning_rate[method], color=colors[method], ls='--',label=method)
+        
+    axes.set_yscale('log')
+    axes.set_xlabel('epoch')
+    axes.set_ylabel('Learning rate for discrimination')
+    axes.set_title('%s dataset %s '%(args.dataset, args.runname))
+    axes.legend()
+
+    fig.savefig(resultsdir+'learningrateF_results_%depochs.pdf'%args.epochs, dpi=200)
+    fig.savefig(resultsdir+'learningrateF_results_%depochs.png'%args.epochs, dpi=200)
+
+    plt.clf()

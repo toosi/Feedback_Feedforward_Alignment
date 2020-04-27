@@ -3,7 +3,9 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 import torchvision.models as models
-from modules import customized_modules_simple as customized_modules
+# from modules import customized_modules_simple as customized_modules
+from modules import customized_modules_layerwise as customized_modules
+
 # print('******* in custom_models',torch.__version__,'*******')
 # print(torch.__file__)
 
@@ -64,8 +66,9 @@ class AsymResLNet10F(nn.Module):
         #self.fc = nn.Linear(self.base_channels*16, 1000)
 
     def forward(self, x):
-
+        
         x = self.conv1(x)
+        
         x = self.relu(self.bn1(x)) #self.relu(self.bn1(x))
 
         # layer 1
@@ -124,7 +127,7 @@ class AsymResLNet10B(nn.Module):
         # self.bn43 = nn.BatchNorm2d(self.base_channels*4,momentum=0.1, track_running_stats=False)
         self.upsample2 =  ConvTranspose2d(self.n_classes, self.base_channels*2,kernel_size=1, stride=2, padding=0, output_padding=1, algorithm=algorithm)
         self.bn42 = getattr(nn, normalization)(self.n_classes,momentum=0.1, track_running_stats=False)
-        self.conv42 = ConvTranspose2d(self.n_classes, self.base_channels*2, kernel_size=3,stride=1,  padding=1, output_padding=0, algorithm=algorithm)
+        self.conv42 = ConvTranspose2d(self.n_classes, self.base_channels*2, kernel_size=3, stride=1, padding=1, output_padding=0, algorithm=algorithm)
         self.relu = nn.ReLU(inplace=True)
         self.bn41 = getattr(nn, normalization)(self.base_channels*2,momentum=0.1, track_running_stats=False)
         self.conv41 = ConvTranspose2d(self.base_channels*2, self.base_channels*2, stride=1, kernel_size=3, padding=1, output_padding=0, algorithm=algorithm)
@@ -162,8 +165,8 @@ class AsymResLNet10B(nn.Module):
         
         # layer 2 
         identity = x 
-        x2 = x
         x = self.bn42(x)
+        
         x = self.conv42(x)
         x = self.relu(self.bn41(x))
         x = self.conv41(x)
@@ -180,7 +183,6 @@ class AsymResLNet10B(nn.Module):
 
         # layer 1
         identity = x 
-        x1 = x
         x = self.bn22(x)
         x = self.conv22(x)
         x = self.relu(self.bn21(x))
