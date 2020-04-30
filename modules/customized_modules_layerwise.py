@@ -15,9 +15,10 @@ import copy
 class LinearAsymFunc(autograd.Function):
     @staticmethod
     # same as reference linear function, but with additional fa tensor for backward
-    def forward(context, input, weight, weight_feedback, bias, algorithm_id):
+    def forward(context, input, weight, weight_feedback, bias, algorithm_id, primitive_weights):
 
-        context.save_for_backward(input, weight, weight_feedback, bias, Variable(torch.tensor(algorithm_id)))
+        context.save_for_backward(input, weight, weight_feedback, bias, Variable(torch.tensor(algorithm_id)), \
+            Variable(torch.tensor(primitive_weights)))
         output = input.mm(weight.t())
         if bias is not None:
             output += bias.unsqueeze(0).expand_as(output)
@@ -25,7 +26,7 @@ class LinearAsymFunc(autograd.Function):
 
     @staticmethod
     def backward(context, grad_output):
-        input, weight, weight_feedback, bias, algorithm_id = context.saved_variables
+        input, weight, weight_feedback, bias, algorithm_id, primitive_weights = context.saved_variables
         grad_input = grad_weight = grad_weight_feedback = grad_bias = None
 
         if context.needs_input_grad[0]:
@@ -46,15 +47,15 @@ class LinearAsymFunc(autograd.Function):
                 xlp1T = input.mm(weight.t()).t()
                 xlxlp1T = -xlp1T.mm(xl) 
                 #print(torch.chain_matmul(weight_feedback,xlxlp1T.t(),xlxlp1T ).shape)
-                alpha = 0.3
-                beta = 0.02
-                gamma = 3*10e-6
+                alpha = primitive_weights[0] #0.3
+                beta = primitive_weights[1] #0.02
+                gamma = primitive_weights[2] #3*10e-6
                 grad_weight_feedback = -alpha*xlxlp1T -gamma*torch.chain_matmul(weight_feedback,xlxlp1T.t(),xlxlp1T ) -beta*weight_feedback
          
         if bias is not None and context.needs_input_grad[3]:
             grad_bias = grad_output.sum(0).squeeze(0)
 
-        return grad_input, grad_weight, grad_weight_feedback, grad_bias, None
+        return grad_input, grad_weight, grad_weight_feedback, grad_bias, None, None
 
 
 
@@ -68,7 +69,7 @@ class LinearModule(nn.Module):
 
     __constants__ = ['bias', 'in_features', 'out_features']
 
-    def __init__(self, in_features, out_features, bias=False, algorithm='BP', bottomup=1):
+    def __init__(self, in_features, out_features, bias=False, algorithm='BP', bottomup=1, primitive_weights=[0,0,0]):
         super(LinearModule, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -76,6 +77,7 @@ class LinearModule(nn.Module):
         self.weight_feedback = Parameter(torch.FloatTensor( out_features, in_features), requires_grad=True)
         self.bottomup = bottomup
         self.algorithm = algorithm
+        self.primitive_weights =  primitive_weights
         if self.algorithm == 'FA':
             self.algorithm_id = 0
         elif self.algorithm.startswith('SL'):
@@ -101,22 +103,22 @@ class LinearModule(nn.Module):
 
     def forward(self, inputs):
         
-        if self.algorithm == 'BP':
-            self.weight_feedback = copy.deepcopy(self.weight)#.contiguous()
+        # if self.algorithm == 'BP':
+        #     self.weight_feedback = copy.deepcopy(self.weight).contiguous()
             
         if self.bottomup:
                 
             if self.algorithm == 'BP':
                 return F.linear(inputs, self.weight, self.bias)
             else:
-                return LinearAsymFunc.apply(inputs, self.weight, self.weight_feedback, self.bias, self.algorithm_id)
+                return LinearAsymFunc.apply(inputs, self.weight, self.weight_feedback, self.bias, self.algorithm_id, self.primitive_weights)
     
         else:
             
             if self.algorithm == 'BP':
                 return F.linear(inputs, self.weight_feedback.t(), self.bias)
             else:
-                return LinearAsymFunc.apply(inputs, self.weight_feedback.t(), self.weight.t(), self.bias, self.algorithm_id)
+                return LinearAsymFunc.apply(inputs, self.weight_feedback.t(), self.weight.t(), self.bias, self.algorithm_id, self.primitive_weights)
 
     def extra_repr(self):
         return 'in_features={}, out_features={}, bias={}'.format(
@@ -128,17 +130,18 @@ class LinearModule(nn.Module):
 class ConvAsymFunc(autograd.Function):
     @staticmethod
     # same as reference linear function, but with additional fa tensor for backward
-    def forward(context, inputs, weight, weight_feedback, bias, stride, padding, groups, dilation, algorithm_id):
+    def forward(context, inputs, weight, weight_feedback, bias, stride, padding, groups, dilation, algorithm_id, primitive_weights):
         #note that only symmetric stride, padding, etc are supported for now
-        context.save_for_backward(inputs, weight, weight_feedback, bias, Variable(torch.tensor(stride[0])), Variable(torch.tensor(padding[0])), Variable(torch.tensor(groups)), Variable(torch.tensor(dilation[0])), Variable(torch.tensor(algorithm_id)))
+        context.save_for_backward(inputs, weight, weight_feedback, bias, Variable(torch.tensor(stride[0])),\
+            Variable(torch.tensor(padding[0])), Variable(torch.tensor(groups)), Variable(torch.tensor(dilation[0])),\
+            Variable(torch.tensor(algorithm_id)), Variable(torch.tensor(primitive_weights)))
         
-        output = F.conv2d(inputs, weight, bias, stride, padding, dilation, groups)
-                
+        output = F.conv2d(inputs, weight, bias, stride, padding, dilation, groups)                
         return output
 
     @staticmethod
     def backward(context, grad_output):
-        inputs, weight, weight_feedback, bias, stride, padding, groups, dilation, algorithm_id = context.saved_tensors
+        inputs, weight, weight_feedback, bias, stride, padding, groups, dilation, algorithm_id, primitive_weights = context.saved_tensors
         stride, padding, groups, dilation = stride.item(), padding.item(), groups.item(), dilation.item()
         grad_input = grad_weight = grad_weight_feedback = grad_bias = None
         grad_stride= grad_padding= grad_groups= grad_dilation = None
@@ -198,15 +201,15 @@ class ConvAsymFunc(autograd.Function):
                     loss_local = criterion_recons(output_local, inputs)
                     grad_weight_feedback_recons = autograd.grad(loss_local, net_local[1].weight, allow_unused=True)[0]
                     null_grad = autograd.grad(0.5*output_local**2, net_local[1].weight, allow_unused=True)[0]
-                alpha = 0.3
-                beta = 0.02
-                gamma = 3*10e-6
+                alpha = primitive_weights[0] #0.3
+                beta = primitive_weights[1] #0.02
+                gamma = primitive_weights[2] #3*10e-6
                 grad_weight_feedback = alpha*grad_weight_feedback_recons -beta * weight_feedback - gamma * null_grad
         
         if bias is not None and context.needs_input_grad[3]:
             grad_bias = grad_output.sum(0).squeeze(0)
 
-        return grad_input, grad_weight, grad_weight_feedback, grad_bias,grad_stride, grad_padding, grad_groups, grad_dilation, None
+        return grad_input, grad_weight, grad_weight_feedback, grad_bias,grad_stride, grad_padding, grad_groups, grad_dilation, None, None
 
 
 # class ConvTAsymFunc(autograd.Function):
@@ -475,7 +478,7 @@ class AsymmetricFeedbackConv2d(_ConvNdFA):
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1,
-                 bias=False, padding_mode='zeros', algorithm='BP', bottomup=1):
+                 bias=False, padding_mode='zeros', algorithm='BP', primitive_weights=[0,0,0], bottomup=1):
         kernel_size = _pair(kernel_size)
         stride = _pair(stride)
         padding = _pair(padding)
@@ -489,12 +492,12 @@ class AsymmetricFeedbackConv2d(_ConvNdFA):
             in_channels , out_channels, kernel_size, stride, padding, dilation,
             self.transposed, _pair(0), groups, bias, padding_mode, algorithm, bottomup)
         
-        
+        self.primitive_weights = primitive_weights
         self.algorithm = algorithm
         if self.algorithm == 'FA':
             self.algorithm_id = 0
         elif self.algorithm.startswith('SL'):
-            self.algorithm_id = 0
+            self.algorithm_id = 1
         elif self.algorithm ==  'IA':
             self.algorithm_id = 1
         
@@ -531,14 +534,16 @@ class AsymmetricFeedbackConv2d(_ConvNdFA):
                 return F.conv_transpose2d(input, self.weight.permute(1,0,2,3), self.bias, self.stride, self.padding,
                 output_padding, self.groups, self.dilation)
             else:
-                return ConvTAsymFunc.apply(input, self.weight_feedback.permute(1,0,2,3), self.weight_feedback ,self.bias, self.stride, self.padding, self.groups, self.dilation, self.algorithm_id)
+                return ConvTAsymFunc.apply(input, self.weight_feedback.permute(1,0,2,3), self.weight_feedback, \
+                self.bias, self.stride, self.padding, self.groups, self.dilation, self.algorithm_id)
 
         else:
             
             if self.algorithm == 'BP':
                 return F.conv2d(input, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
             else:
-                return ConvAsymFunc.apply(input, self.weight, self.weight_feedback ,self.bias, self.stride, self.padding, self.groups, self.dilation, self.algorithm_id)
+                return ConvAsymFunc.apply(input, self.weight, self.weight_feedback ,self.bias, self.stride,\
+                self.padding, self.groups, self.dilation, self.algorithm_id, self.primitive_weights)
 
 
 

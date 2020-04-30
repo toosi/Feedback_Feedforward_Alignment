@@ -296,9 +296,9 @@ def main_worker(gpu, ngpus_per_node, args):
         args.algorithm = 'BP'
         modelidentifier = 'C' #'Control
     else:
-        args.algorithm = 'FA'
+        args.algorithm = args.method
         modelidentifier = 'F'
-    modelF = get_model(args.arche, args.gpu, {'algorithm': args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}) #, 'woFullyConnected':True
+    modelF = get_model(args.arche, args.gpu, {'algorithm': args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'primitive_weights':args.primitive_weights}) #, 'woFullyConnected':True
     modelB = get_model(args.archd, args.gpu, {'algorithm': 'FA','base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes})
 
     
@@ -876,12 +876,13 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             if 'AsymResLNet' in args.arche:
                 modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))
             elif 'asymresnet' in args.arche:
-                modelB.load_state_dict(toggle_state_dict(modelF.state_dict(),modelB.state_dict()))
+                modelB.load_state_dict(toggle_state_dict(modelF.state_dict(), modelB.state_dict()))
 
 
         if any(m in args.method for m in ['FA','BP', 'BSL']):
-
-            _,recons = modelB(latents.detach())
+            # Diabled modelB
+            # _, recons = modelB(latents.detach())
+            recons = images
             gener = recons
             reference = images
             reference = F.interpolate(reference, size=gener.shape[-1])
@@ -1081,12 +1082,12 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             optimizerF.step()
 
         latents, _ = modelF(images)
-        _, recons = modelB(latents.detach())
-        # recons_interp = F.interpolate(recons, size=images.shape[-1])
-        # latents_gener, output_gener = modelF(recons_interp.detach())
-        lossL = torch.tensor([0]) # criteriond(latents_gener, latents.detach())
+        # Disabled modelB temporary to check resnet18c
+        # _, recons = modelB(latents.detach())
+        recons = images
 
-
+      
+        lossL = torch.tensor([0]) 
         losslatent.update(lossL.item(), images.size(0))
 
         # # compute the accuracy after all training magics    
@@ -1174,7 +1175,9 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
             # ----- decoder ------------------ 
 
             latents,  _ = modelF(images)
-            _,recons = modelB(latents.detach())
+            # Disabled modelB temporary to check resnet18c
+            # _, recons = modelB(latents.detach())
+            recons = images
 
             if args.method == 'SLTemplateGenerator':
                 repb = onehot.detach()#modelB(onehot.detach())

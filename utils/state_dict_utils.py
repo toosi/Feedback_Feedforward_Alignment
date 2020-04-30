@@ -345,7 +345,7 @@ def toggle_state_dict_BPtoYY(state_dict_BP, state_dict_YY):
 def toggle_state_dict_YYtoBP(state_dict_YY, state_dict_BP):
 
     """ copies the forward of a YY net to forward of the BP net
-        and the backward of BP
+        (used to copy to the backward of BP but removed at April 29th)
     """
 
     new_state_dict = copy.deepcopy(state_dict_BP)
@@ -356,8 +356,9 @@ def toggle_state_dict_YYtoBP(state_dict_YY, state_dict_BP):
 
         if 'feedback' not in k:
             new_state_dict.update({k:item})
-            if ('weight' in k) and ('bn' not in k):
-                new_state_dict.update({k+'_feedback':item})
+            # This part seems not necessary
+            # if ('weight' in k) and ('bn' not in k):
+            #     new_state_dict.update({k+'_feedback':item})
 
     return new_state_dict
 

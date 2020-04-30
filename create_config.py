@@ -83,6 +83,7 @@ elif socket.gethostname()[0:2] == 'ax':
 
 parser.add_argument('--base_channels', default=64, type=int, metavar='N',
                     help='base_channels')
+parser.add_argument('--primitive_weights', nargs='+', type=float,default=[0,0,0])
 
 parser.add_argument('--input_size', default=None, type=int, metavar='N',
                     help='input image size')
