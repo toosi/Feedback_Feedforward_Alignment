@@ -204,7 +204,7 @@ class ConvAsymFunc(autograd.Function):
                 alpha = primitive_weights[0] #0.3
                 beta = primitive_weights[1] #0.02
                 gamma = primitive_weights[2] #3*10e-6
-                grad_weight_feedback = alpha*grad_weight_feedback_recons -beta * weight_feedback - gamma * null_grad
+                grad_weight_feedback = -alpha*grad_weight_feedback_recons -beta * weight_feedback - gamma * null_grad
         
         if bias is not None and context.needs_input_grad[3]:
             grad_bias = grad_output.sum(0).squeeze(0)

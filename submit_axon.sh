@@ -1,9 +1,9 @@
 #!/bin/sh
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
-#SBATCH -c 20
-#SBATCH --gres=gpu:4
-#SBATCH --mem=40gb
+#SBATCH -c 10
+#SBATCH --gres=gpu:1
+#SBATCH --mem=20gb
 #  #SBATCH --array=0-3
 #SBATCH --time=5-00:00:00
 
@@ -20,7 +20,7 @@ module load anaconda3-2019.03
 source activate /home/tt2684/conda-envs/pytorch_tensorflow_latest
 
 now=$(date +'%Y-%m-%d_%H-%M')
-note='**modules_layerwise_weighted_primitives_Disabled_modelB**'
+note='**modules_layerwise_weighted_primitives**'
 # imagenet_with_modified_resnets_wobn1_trackFalse_wolastAcc
 # Cycle_Consistency AdvTrainingFGSM_epsilon0.2_withOUTSperateOptimizerscheduler
 # AdvTrainingFGSM_epsilon0.2_withscheduler
@@ -37,13 +37,13 @@ init=Apr01-18-30_CIFAR10_eab5f35996_115 # use: -loadinitialization $init
 # python -u create_config.py -dataset CIFAR10   -j 4  --gamma 0  --input_size 32 --base_channels 64 --batch-size 256 --epoch 1000 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'SGD' --lrF 1e-1 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 # python -u create_config.py -dataset MNIST  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 150 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
-# python -u create_config.py -dataset CIFAR10 -j 24 --input_size 32 --primitive_weights 1019.1 7.9 3e-6  --batch-size 256 --epoch 200 -ae 'resnet18c' -ad 'resnet18c' --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1.25e-1 --lrB 1e-3 --wdF 0 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
-python -u create_config.py -dataset imagenet  -j 4 --input_size 224 --primitive_weights 1019.1 7.9 3e-6 --batch-size 256 --epoch 500 -ae 'resnet18c' -ad 'resnet18c' --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1.25e-1 --lrB 1e-3 --wdF 0 --wdB 1e-6 --patiencee 10 --patienced 8 -p 100 --note  $note ; config=1  #
+# python -u create_config.py -dataset CIFAR10 -j 24 --input_size 32 --primitive_weights 1019.1 7.9 3e-6  --batch-size 256 --epoch 200 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1.25e-1 --lrB 1e-3 --wdF 0 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py -dataset imagenet  -j 4 --input_size 224 --primitive_weights 1019.1 7.9 3e-6 --batch-size 256 --epoch 500 -ae 'resnet18c' -ad 'resnet18c' --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1.25e-1 --lrB 1e-3 --wdF 0 --wdB 1e-6 --patiencee 10 --patienced 8 -p 100 --note  $note ; config=1  #
 
 
 if [ $config == 0 ]
   then
-  runname='Apr29-14-48_CIFAR10_995e9d5f20_233' # 'Feb14-09-08_CIFAR10_a3e0466f41_592'  #
+  runname='Apr30-14-20_CIFAR10_2f5c99d232_622' # 'Feb14-09-08_CIFAR10_a3e0466f41_592'  #
   configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
   methods=('IA' 'SLVanilla' 'BP' 'FA') # 'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
   # methods=('SLAdvImgCC0' 'SLAdvCostCC0' 'BPCC0' 'FACC0' 'SLVanillaCC0' 'SLErrorCC0' )
@@ -51,7 +51,7 @@ if [ $config == 0 ]
   # methods=('BP' 'FA' 'SLVanilla' 'SLLatentRobust' 'SLAdvImg' 'SLError')
   # python -u main_train.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
   
-  # python -u main_train.py --method 'FA'  --config-file $configpath
+  # python -u main_train.py --method 'BP'  --config-file $configpath
 
   # printf " $methods \n"
   # SLConv1 needs to be run in one gpu because of hooks

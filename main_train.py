@@ -340,6 +340,7 @@ def main_worker(gpu, ngpus_per_node, args):
         # list_paramsF = [dict_params_firstF, dict_params_middleF, dict_params_lastF]
         # list_paramsF = [p for p in list(modelF.parameters()) if p.requires_grad==True]
         list_paramsF = [p for n,p in list(modelF.named_parameters()) if 'feedback' not in n]
+        list_paramsFB_local = [p for n,p in list(modelF.named_parameters()) if 'feedback' in n]
 
         # dict_params_firstB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-3}
         # dict_params_lastB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-3}
@@ -347,6 +348,8 @@ def main_worker(gpu, ngpus_per_node, args):
         # list_paramsB = [dict_params_firstB, dict_params_middleB, dict_params_lastB]
         # list_paramsB = [p for p in list(modelB.parameters()) if p.requires_grad==True]
         list_paramsB = [p for n,p in list(modelB.named_parameters()) if 'feedback' not in n]
+
+        optimizerFB_local = torch.optim.Adam(list_paramsFB_local, lr=0.0097)
 
         if 'Adam' in args.optimizerF:
 
@@ -359,6 +362,7 @@ def main_worker(gpu, ngpus_per_node, args):
             optimizerF = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
                                     momentum=args.momentum,
                                     weight_decay=args.wdF,
+                                    nesterov=True
                                     )
             optimizerF3 = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
                         momentum=args.momentum,
@@ -602,7 +606,7 @@ def main_worker(gpu, ngpus_per_node, args):
         print('*****  lrF=%1e'%(lrF))
         
         # train for one epoch
-        modelF, modelB, train_results = train(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB,optimizerF3, schedulerF,schedulerB,schedulerF3, epoch, args)
+        modelF, modelB, train_results = train(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB,optimizerF3, schedulerF,schedulerB,schedulerF3, optimizerFB_local, epoch, args)
         Train_acce_list.extend( [round(train_results[0],3)])
         Train_corrd_list.extend([round(train_results[1],3)])
         Train_lossd_list.extend([train_results[2]])
@@ -804,7 +808,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
         
-def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, optimizerB,optimizerF3,schedulerF,schedulerB,schedulerF3, epoch, args):
+def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, optimizerB,optimizerF3,schedulerF,schedulerB,schedulerF3, optimizerFB_local, epoch, args):
 
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
@@ -860,8 +864,10 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
 
         # compute gradient and do SGD step
         optimizerF.zero_grad()
+        optimizerFB_local.zero_grad()
         losse.backward()
         optimizerF.step()
+        optimizerFB_local.step()
         #schedulerF.step()
         if args.method == 'BP':
             modelF.load_state_dict(toggle_state_dict_YYtoBP(modelF.state_dict(), modelF.state_dict()))
@@ -880,9 +886,11 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
 
 
         if any(m in args.method for m in ['FA','BP', 'BSL']):
-            # Diabled modelB
-            # _, recons = modelB(latents.detach())
-            recons = images
+            if args.arche.startswith('resnet18c'):
+                recons = images # Diabled modelB
+            else:
+                _, recons = modelB(latents.detach())
+            
             gener = recons
             reference = images
             reference = F.interpolate(reference, size=gener.shape[-1])
@@ -1082,9 +1090,11 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             optimizerF.step()
 
         latents, _ = modelF(images)
-        # Disabled modelB temporary to check resnet18c
-        # _, recons = modelB(latents.detach())
-        recons = images
+
+        if args.arche.startswith('resnet18c'):
+            recons = images # Diabled modelB
+        else:
+            _, recons = modelB(latents.detach())
 
       
         lossL = torch.tensor([0]) 
@@ -1175,9 +1185,10 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
             # ----- decoder ------------------ 
 
             latents,  _ = modelF(images)
-            # Disabled modelB temporary to check resnet18c
-            # _, recons = modelB(latents.detach())
-            recons = images
+            if args.arche.startswith('resnet18c'):
+                recons = images # Diabled modelB
+            else:
+                _, recons = modelB(latents.detach())
 
             if args.method == 'SLTemplateGenerator':
                 repb = onehot.detach()#modelB(onehot.detach())
