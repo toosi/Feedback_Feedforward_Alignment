@@ -185,8 +185,13 @@ class ConvAsymFunc(autograd.Function):
                 grad_weight_feedback = weight_feedback-weight_feedback
             elif algorithm_id == 1: #Info_align                
                 m1 = nn.Conv2d(weight.shape[0], weight.shape[1], weight.shape[2], bias=bias, stride=stride, padding=padding, groups=groups, dilation=dilation)
+                bn1 = nn.BatchNorm2d(weight.shape[1])
+                insn1 = nn.InstanceNorm2d(weight.shape[1])
                 m2 = nn.ConvTranspose2d(weight_feedback.shape[0], weight_feedback.shape[1], weight_feedback.shape[2], bias=bias, stride=stride, padding=padding, output_padding=0, groups=groups, dilation=dilation)
-                net_local = nn.Sequential(m1, m2)
+                insn2 = nn.InstanceNorm2d(weight_feedback.shape[1])
+
+
+                net_local = nn.Sequential(m1, nn.ReLU(), F.normalize(dim=1), bn1, m2)
                 criterion_recons = nn.MSELoss()
                 xl = inputs.detach().clone()
                 xl.requires_grad = False
@@ -198,13 +203,13 @@ class ConvAsymFunc(autograd.Function):
                 # print('net_local', net_local)
                 with torch.enable_grad():
                     output_local = net_local(xl)
-                    loss_local = criterion_recons(output_local, inputs)
+                    loss_local = criterion_recons(output_local, xl)
                     grad_weight_feedback_recons = autograd.grad(loss_local, net_local[1].weight, allow_unused=True)[0]
                     null_grad = autograd.grad(0.5*output_local**2, net_local[1].weight, allow_unused=True)[0]
                 alpha = primitive_weights[0] #0.3
                 beta = primitive_weights[1] #0.02
                 gamma = primitive_weights[2] #3*10e-6
-                grad_weight_feedback = -alpha*grad_weight_feedback_recons -beta * weight_feedback - gamma * null_grad
+                grad_weight_feedback = - alpha*grad_weight_feedback_recons - beta * weight_feedback - gamma * null_grad
         
         if bias is not None and context.needs_input_grad[3]:
             grad_bias = grad_output.sum(0).squeeze(0)

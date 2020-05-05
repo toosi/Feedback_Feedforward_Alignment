@@ -298,7 +298,7 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
         args.algorithm = args.method
         modelidentifier = 'F'
-    modelF = get_model(args.arche, args.gpu, {'algorithm': args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'primitive_weights':args.primitive_weights}) #, 'woFullyConnected':True
+    modelF = get_model(args.arche, args.gpu, {'algorithm': args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}) #, 'primitive_weights':args.primitive_weights, 'woFullyConnected':True
     modelB = get_model(args.archd, args.gpu, {'algorithm': 'FA','base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes})
 
     
@@ -362,7 +362,7 @@ def main_worker(gpu, ngpus_per_node, args):
             optimizerF = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
                                     momentum=args.momentum,
                                     weight_decay=args.wdF,
-                                    nesterov=True
+                                    
                                     )
             optimizerF3 = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
                         momentum=args.momentum,

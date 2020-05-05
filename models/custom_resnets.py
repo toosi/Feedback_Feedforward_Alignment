@@ -11,8 +11,8 @@ needs state_dict_utils.toggle_state_dict_resnets to toggle the weights in SL
 
 import torch
 import torch.nn as nn
-# from modules import customized_modules_simple as customized_modules
-from modules import customized_modules_layerwise as customized_modules
+from modules import customized_modules_simple as customized_modules
+# from modules import customized_modules_layerwise as customized_modules
 try:
     from torch.hub import load_state_dict_from_url
 except ImportError:
@@ -49,15 +49,15 @@ model_urls = {
 }
 
 
-def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1, bias=False, algorithm='BP', primitive_weights=[0,0,0]):
+def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1, bias=False, algorithm='BP'):
     """3x3 convolution with padding"""
     return Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=dilation, groups=groups, bias=False, dilation=dilation, algorithm=algorithm, primitive_weights=primitive_weights)
+                     padding=dilation, groups=groups, bias=False, dilation=dilation, algorithm=algorithm)
 
 
-def conv1x1(in_planes, out_planes, stride=1, bias=False, algorithm='BP', primitive_weights=[0,0,0]):
+def conv1x1(in_planes, out_planes, stride=1, bias=False, algorithm='BP'):
     """1x1 convolution"""
-    return Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False, algorithm=algorithm, primitive_weights=primitive_weights)
+    return Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False, algorithm=algorithm)
 
 
 class BasicBlock(nn.Module):
@@ -65,7 +65,7 @@ class BasicBlock(nn.Module):
     __constants__ = ['downsample']
 
     def __init__(self, inplanes, planes, stride=1, downsample=None, groups=1,
-                 base_width=64, dilation=1, norm_layer=None, algorithm='BP', primitive_weights=[0,0,0]):
+                 base_width=64, dilation=1, norm_layer=None, algorithm='BP'):
         super(BasicBlock, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -74,11 +74,11 @@ class BasicBlock(nn.Module):
         if dilation > 1:
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
-        self.conv1 = conv3x3(inplanes, planes, stride, bias=False, algorithm=algorithm, primitive_weights=primitive_weights)
-        # self.bn1 = norm_layer(planes)
+        self.conv1 = conv3x3(inplanes, planes, stride, bias=False, algorithm=algorithm)
+        self.bn1 = norm_layer(planes, affine=False, track_running_stats=False) # downsampling
         self.relu = nn.ReLU(inplace=False)
-        self.conv2 = conv3x3(planes, planes, bias=False, algorithm=algorithm, primitive_weights=primitive_weights)
-        self.bn2 = norm_layer(planes, track_running_stats=False)
+        self.conv2 = conv3x3(planes, planes, bias=False, algorithm=algorithm, )
+        self.bn2 = norm_layer(planes,affine=False, track_running_stats=False)
         self.downsample = downsample
         self.stride = stride
 
@@ -86,7 +86,7 @@ class BasicBlock(nn.Module):
         identity = x
 
         out = self.conv1(x)
-        # out = self.bn1(out)
+        out = self.bn1(out) #
         out = self.relu(out)
 
         out = self.conv2(out)
@@ -106,17 +106,17 @@ class Bottleneck(nn.Module):
     __constants__ = ['downsample']
 
     def __init__(self, inplanes, planes, stride=1, downsample=None, groups=1,
-                 base_width=64, dilation=1, norm_layer=None, algorithm='BP', primitive_weights=[0,0,0]):
+                 base_width=64, dilation=1, norm_layer=None, algorithm='BP'):
         super(Bottleneck, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         width = int(planes * (base_width / 64.)) * groups
         # Both self.conv2 and self.downsample layers downsample the input when stride != 1
-        self.conv1 = conv1x1(inplanes, width, bias=False, algorithm=algorithm, primitive_weights=primitive_weights)
+        self.conv1 = conv1x1(inplanes, width, bias=False, algorithm=algorithm,)
         self.bn1 = norm_layer(width)
-        self.conv2 = conv3x3(width, width, stride, groups, dilation, bias=False, algorithm=algorithm, primitive_weights=primitive_weights)
+        self.conv2 = conv3x3(width, width, stride, groups, dilation, bias=False, algorithm=algorithm,)
         self.bn2 = norm_layer(width)
-        self.conv3 = conv1x1(width, planes * self.expansion, bias=False, algorithm=algorithm, primitive_weights=primitive_weights)
+        self.conv3 = conv1x1(width, planes * self.expansion, bias=False, algorithm=algorithm,)
         self.bn3 = norm_layer(planes * self.expansion)
         self.relu = nn.ReLU(inplace=False)
         self.downsample = downsample
@@ -149,7 +149,7 @@ class AsymResNet(nn.Module):
 
     def __init__(self, block, layers, n_classes=10,image_channels=3,base_channels=64, zero_init_asymresidual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
-                 norm_layer=None, algorithm='BP',primitive_weights=[0,0,0]):
+                 norm_layer=None, algorithm='BP'):
         super(AsymResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -167,19 +167,19 @@ class AsymResNet(nn.Module):
         self.groups = groups
         self.base_width = width_per_group
         self.conv1 = Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1,
-                               bias=False, algorithm=algorithm, primitive_weights=primitive_weights)
-        self.bn1 = norm_layer(self.inplanes, track_running_stats=False)
+                               bias=False, algorithm=algorithm,)
+        self.bn1 = norm_layer(self.inplanes,affine=False, track_running_stats=False)
         self.relu = nn.ReLU(inplace=False)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0], algorithm=algorithm, primitive_weights=primitive_weights)
+        self.layer1 = self._make_layer(block, 64, layers[0], algorithm=algorithm, )
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
-                                       dilate=replace_stride_with_dilation[0], algorithm=algorithm, primitive_weights=primitive_weights)
+                                       dilate=replace_stride_with_dilation[0], algorithm=algorithm, )
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
-                                       dilate=replace_stride_with_dilation[1], algorithm=algorithm, primitive_weights=primitive_weights)
+                                       dilate=replace_stride_with_dilation[1], algorithm=algorithm, )
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
-                                       dilate=replace_stride_with_dilation[2], algorithm=algorithm, primitive_weights=primitive_weights)
+                                       dilate=replace_stride_with_dilation[2], algorithm=algorithm, )
         self.conv2 = Conv2d(512, n_classes, kernel_size=3, stride=1, padding=1,
-                               bias=False, algorithm=algorithm, primitive_weights=primitive_weights)
+                               bias=False, algorithm=algorithm, )
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         # self.fc = Linear(512 * block.expansion, n_classes, algorithm=algorithm)
 
@@ -187,8 +187,9 @@ class AsymResNet(nn.Module):
             if isinstance(m, Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
+                if m.affine:
+                    nn.init.constant_(m.weight, 1)
+                    nn.init.constant_(m.bias, 0)
 
         # Zero-initialize the last BN in each asymresidual branch,
         # so that the asymresidual branch starts with zeros, and each asymresidual block behaves like an identity.
@@ -200,7 +201,7 @@ class AsymResNet(nn.Module):
                 elif isinstance(m, BasicBlock):
                     nn.init.constant_(m.bn2.weight, 0)
 
-    def _make_layer(self, block, planes, blocks, stride=1, dilate=False, algorithm='BP', primitive_weights=[0,0,0]):
+    def _make_layer(self, block, planes, blocks, stride=1, dilate=False, algorithm='BP'):
         norm_layer = self._norm_layer
         downsample = None
         previous_dilation = self.dilation
@@ -208,18 +209,18 @@ class AsymResNet(nn.Module):
             self.dilation *= stride
             stride = 1
         if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = conv1x1(self.inplanes, planes * block.expansion, stride, bias=False, algorithm=algorithm, primitive_weights=primitive_weights)
-                # norm_layer(planes * block.expansion, track_running_stats=False),
+            downsample = conv1x1(self.inplanes, planes * block.expansion, stride, bias=False, algorithm=algorithm)
+                # norm_layer(planes * block.expansion,affine=False, track_running_stats=False),)
             
 
         layers = []
         layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
-                            self.base_width, previous_dilation, norm_layer, algorithm=algorithm, primitive_weights=primitive_weights))
+                            self.base_width, previous_dilation, norm_layer, algorithm=algorithm, ))
         self.inplanes = planes * block.expansion
         for _ in range(1, blocks):
             layers.append(block(self.inplanes, planes, groups=self.groups,
                                 base_width=self.base_width, dilation=self.dilation,
-                                norm_layer=norm_layer, algorithm=algorithm, primitive_weights=primitive_weights))
+                                norm_layer=norm_layer, algorithm=algorithm, ))
 
         return nn.Sequential(*layers)
 
@@ -399,10 +400,10 @@ class BasicBlockT(nn.Module):
             raise NotImplementedError("Dilation > 1 not supported in BasicBlockT")
         # Both self.conv1 and self.upsample layers upsample the input when stride != 1
         self.conv1 = convT3x3(planes, inplanes,  stride, bias=False, algorithm=algorithm)
-        # self.bn1 = norm_layer(inplanes, track_running_stats=False)
+        self.bn1 = norm_layer(inplanes, affine=False, track_running_stats=False)#umsampling
         self.relu = nn.ReLU(inplace=False)
         self.conv2 = convT3x3(planes, planes, bias=False, algorithm=algorithm)
-        self.bn2 = norm_layer(planes, track_running_stats=False)
+        self.bn2 = norm_layer(planes,affine=False, track_running_stats=False)
         self.upsample = upsample
         self.stride = stride
 
@@ -414,7 +415,7 @@ class BasicBlockT(nn.Module):
         out = self.relu(out)
 
         out = self.conv1(out)
-        # out = self.bn1(out)
+        out = self.bn1(out) #
 
         if self.upsample is not None:
             identity = self.upsample(x)
@@ -437,7 +438,7 @@ class BottleneckT(nn.Module):
         width = int(planes * (base_width / 64.)) * groups
         # Both self.conv2 and self.upsample layers upsample the input when stride != 1
         self.conv1 = convT1x1(width, inplanes, bias=False, algorithm=algorithm)
-        self.bn1 = norm_layer(width, track_running_stats=False)
+        self.bn1 = norm_layer(width, affine=False,track_running_stats=False)
         self.conv2 = convT3x3(width, width, stride, groups, dilation, bias=False, algorithm=algorithm)
         self.bn2 = norm_layer(width, track_running_stats=False)
         self.conv3 = convT1x1(width, planes * self.expansion, bias=False, algorithm=algorithm)
@@ -501,7 +502,7 @@ class AsymResNetT(nn.Module):
                                        dilate=replace_stride_with_dilation[0], algorithm=algorithm)
         self.layer1 = self._make_layer(block, 64, layers[0], algorithm=algorithm)
         self.relu = nn.ReLU(inplace=False)
-        self.bn1 = norm_layer(self.inplanes, track_running_stats=False)
+        self.bn1 = norm_layer(self.inplanes,affine=False, track_running_stats=False)
         self.conv1 = ConvTranspose2d(self.inplanes, 3, kernel_size=3, stride=1, padding=1,
                                bias=False, algorithm=algorithm)
 
@@ -514,8 +515,9 @@ class AsymResNetT(nn.Module):
             if isinstance(m, ConvTranspose2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
+                if m.affine:
+                    nn.init.constant_(m.weight, 1)
+                    nn.init.constant_(m.bias, 0)
 
         # Zero-initialize the last BN in each asymresidual branch,
         # so that the asymresidual branch starts with zeros, and each asymresidual block behaves like an identity.
@@ -543,7 +545,7 @@ class AsymResNetT(nn.Module):
 
         if stride != 1 or self.inplanes != int(planes / block.expansion):
             upsample = convT1x1(self.inplanes, int(planes / block.expansion), stride, bias=False, algorithm=algorithm)
-                # norm_layer(int(planes / block.expansion)),
+                # norm_layer(int(planes / block.expansion),affine=False,track_running_stats=False),)
             
 
 
