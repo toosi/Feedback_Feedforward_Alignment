@@ -393,8 +393,6 @@ def main_worker(gpu, ngpus_per_node, args):
     schedulerF_original = torch.load(args.resultsdir+'scheduler%s_original.pt'%modelidentifier)
     schedulerB_original = torch.load(args.resultsdir+'schedulerB_original.pt')
 
-
-        
     modelF.load_state_dict(modelF_nottrained)
     modelB.load_state_dict(modelB_nottrained)
 
@@ -1033,7 +1031,6 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 reference = images
                 
      
-                
 
             reference = F.interpolate(reference, size=gener.shape[-1])
 
@@ -1047,6 +1044,8 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             losses.update(lossd.item(), images.size(0))
             corr.update(pcorr, images.size(0))
                 
+            # ## HERE! ATT!
+            # if epoch > 100 :
             # compute gradient and do SGD step
             optimizerB.zero_grad()
             lossd.backward()
