@@ -69,7 +69,7 @@ class LinearModule(nn.Module):
 
     __constants__ = ['bias', 'in_features', 'out_features']
 
-    def __init__(self, in_features, out_features, bias=False, algorithm='BP', bottomup=1, primitive_weights=[0,0,0]):
+    def __init__(self, in_features, out_features, bias=False, algorithm='FA', bottomup=1, primitive_weights=[0,0,0]):
         super(LinearModule, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -144,7 +144,7 @@ class ConvAsymFunc(autograd.Function):
         inputs, weight, weight_feedback, bias, stride, padding, groups, dilation, algorithm_id, primitive_weights = context.saved_tensors
         stride, padding, groups, dilation = stride.item(), padding.item(), groups.item(), dilation.item()
         grad_input = grad_weight = grad_weight_feedback = grad_bias = None
-        grad_stride= grad_padding= grad_groups= grad_dilation = None
+        grad_stride = grad_padding = grad_groups = grad_dilation = None
 
         if context.needs_input_grad[0]:
             
@@ -182,7 +182,12 @@ class ConvAsymFunc(autograd.Function):
         if context.needs_input_grad[2]:
             if algorithm_id == 0 : #FA
                 grad_weight_feedback = weight_feedback-weight_feedback
+<<<<<<< HEAD
             elif algorithm_id == 1: #Info_align   
+=======
+            elif algorithm_id == 1: #Info_align 
+                primitive_weights = torch.tensor([0,0,0])
+>>>>>>> 0ffe11da3b0e72dfae3635d8e475d0553ddce0d1
                 alpha = primitive_weights[0].to(weight.device) #0.3
                 beta = primitive_weights[1].to(weight.device) #0.02
                 gamma = primitive_weights[2].to(weight.device) #3*10e-6  
@@ -195,31 +200,57 @@ class ConvAsymFunc(autograd.Function):
                 # insn2 = nn.InstanceNorm2d(weight_feedback.shape[1])
                 #F.normalize(dim=1)
 
+<<<<<<< HEAD
                 net_local = nn.Sequential(m1, nn.ReLU(), bn1, m2).to(weight.device)
                 criterion_recons = nn.MSELoss()
                 xl = inputs.detach().clone()
                 xl.requires_grad = False
+=======
+                net_local = nn.Sequential(m1, bn1, nn.ReLU(), m2).to(weight.device)
+                criterion_recons = nn.MSELoss()
+                xl = inputs.detach().clone()
+                xl.requires_grad = False
+                xl = xl/torch.norm(xl)
+>>>>>>> 0ffe11da3b0e72dfae3635d8e475d0553ddce0d1
                 # print('xl',xl.shape)
                 # [print(k, t.shape) for k,t in net_local.state_dict().items()]
                 # print('-----------------') 
                 # print('permuted 0.weight:', weight.permute(1, 0, 2, 3).shape,'3.weight:', weight_feedback.shape)
+<<<<<<< HEAD
                 state_dict = {'0.weight': weight, '3.weight': weight_feedback }
+=======
+                state_dict = {'0.weight': weight, '3.weight': weight_feedback } #torch.flip
+>>>>>>> 0ffe11da3b0e72dfae3635d8e475d0553ddce0d1
                 
                 net_local.load_state_dict(state_dict)
 
                 # print('net_local', net_local)
                 with torch.enable_grad():
                     output_local = net_local(xl)
+<<<<<<< HEAD
                     loss_amp = criterion_recons(F.interpolate(output_local,size=xl.shape[-1]), xl)
                     loss_null = criterion_recons(output_local, torch.zeros_like(output_local).to(output_local.device))
                     loss_local = alpha * loss_amp + gamma * loss_null
                     # prnt('-----------------')
+=======
+                    output_local = output_local/ torch.norm(output_local)
+                    loss_amp = criterion_recons(F.interpolate(output_local,size=xl.shape[-1]), xl)
+                    loss_null = criterion_recons(output_local, torch.zeros_like(output_local).to(output_local.device))
+                    loss_local = alpha * loss_amp + gamma * loss_null
+                    
+>>>>>>> 0ffe11da3b0e72dfae3635d8e475d0553ddce0d1
                     grad_weight_feedback_ampnull = autograd.grad(loss_local, net_local[3].weight, allow_unused=True)[0]
                     
                     
                 
+<<<<<<< HEAD
                 grad_weight_feedback = - grad_weight_feedback_ampnull - beta * weight_feedback 
         
+=======
+                grad_weight_feedback =  grad_weight_feedback_ampnull + beta * weight_feedback 
+                # print(grad_weight_feedback[0,1, 0])
+                # prnt('-----------------')
+>>>>>>> 0ffe11da3b0e72dfae3635d8e475d0553ddce0d1
         if bias is not None and context.needs_input_grad[3]:
             grad_bias = grad_output.sum(0).squeeze(0)
 
@@ -411,7 +442,7 @@ class _ConvNdFA(nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel_size, stride,
                  padding, dilation, transposed, output_padding,
-                 groups, bias, padding_mode, algorithm='BP', bottomup=1):
+                 groups, bias, padding_mode, algorithm='FA', bottomup=1):
         super(_ConvNdFA, self).__init__()
         if in_channels % groups != 0:
             raise ValueError('in_channels must be divisible by groups')
@@ -492,7 +523,7 @@ class AsymmetricFeedbackConv2d(_ConvNdFA):
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1,
-                 bias=False, padding_mode='zeros', algorithm='BP', primitive_weights=[0,0,0], bottomup=1):
+                 bias=False, padding_mode='zeros', algorithm='FA', primitive_weights=[0,0,0], bottomup=1):
         kernel_size = _pair(kernel_size)
         stride = _pair(stride)
         padding = _pair(padding)
@@ -571,7 +602,7 @@ class AsymmetricFeedbackConv2d(_ConvNdFA):
 
 #     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
 #                  padding=0, output_padding=0, dilation=1, groups=1,
-#                  bias=False, padding_mode='zeros', algorithm='BP', bottomup=0):
+#                  bias=False, padding_mode='zeros', algorithm='FA', bottomup=0):
 #         kernel_size = _pair(kernel_size)
 #         stride = _pair(stride)
 #         padding = _pair(padding)
