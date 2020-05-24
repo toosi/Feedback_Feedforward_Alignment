@@ -1,10 +1,10 @@
 #!/bin/sh
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
-#SBATCH -c 20
-#SBATCH --gres=gpu:4
-#SBATCH --mem=40gb
-#SBATCH --array=0-3
+#SBATCH -c 80
+#SBATCH --gres=gpu:8
+#SBATCH --mem=180gb
+#SBATCH --array=0-0
 #SBATCH --time=5-00:00:00
 
 if [ X"$SLURM_STEP_ID" = "X" -a X"$SLURM_PROCID" = "X"0 ]
@@ -20,7 +20,7 @@ module load anaconda3-2019.03
 source activate /home/tt2684/conda-envs/pytorch_tensorflow_latest
 
 now=$(date +'%Y-%m-%d_%H-%M')
-note='**Hyperparam_layerwise_modules_GOG**'
+note='**Hyperparam_layerwise_modules_GOG_reOrderOptimizers**'
 # imagenet_with_modified_resnets_wobn1_trackFalse_wolastAcc
 # Cycle_Consistency AdvTrainingFGSM_epsilon0.2_withOUTSperateOptimizerscheduler
 # AdvTrainingFGSM_epsilon0.2_withscheduler
@@ -37,17 +37,19 @@ init='May09-13-40_CIFAR10_adf3aac7c7_866' # use: -loadinitialization $init
 # python -u create_config.py -dataset CIFAR10   -j 4  --gamma 0  --input_size 32 --base_channels 64 --batch-size 256 --epoch 1000 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'SGD' --lrF 1e-1 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 # python -u create_config.py -dataset MNIST  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 150 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
-# betas=(1e-3 1e-1 1e-0 1e2)
-# gamma=1e-10
-# optimizerB='RMSprop'
-# optimizerF='Adam'
-# lrF=0.001
-# for beta in "${betas[@]}"
+# gammas=(1e-10 1e-5 1e-0 1e1)
+gamma=0
+beta=0
+alpha=0
+optimizerB='RMSprop'
+optimizerF='Adam'
+lrF=0.001
+# for gamma in "${gammas[@]}"
 # do
-# python -u create_config.py -loadinitialization $init -dataset CIFAR10 -j 24 --primitive_weights 1e3 $beta $gamma --input_size 32  --batch-size 256 --epoch 500 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF $optimizerF --optimizerB $optimizerB --lrF $lrF --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py  -dataset CIFAR10 -loadinitialization $init  -j 24 --primitive_weights $alpha $beta $gamma --input_size 32  --batch-size 256 --epoch 500 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF $optimizerF --optimizerB $optimizerB --lrF $lrF --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 # done
 
-# python -u create_config.py -dataset imagenet  -j 4 --input_size 224  --batch-size 64 --epoch 500 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 10 --patienced 8 -p 100 --note  $note ; config=1  #
+# python -u create_config.py -dataset imagenet  -j 4 --input_size 224  --batch-size 64 --epoch 100 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF 'Adam' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 10 --patienced 8 -p 100 --note  $note ; config=1  #
 #--primitive_weights 1019.1 7.9 3e-6
 
 if [ $config == 0 ]
@@ -62,7 +64,17 @@ if [ $config == 0 ]
   # runnames=('May11-11-50_CIFAR10_adf3aac7c7_138' 'May11-11-50_CIFAR10_adf3aac7c7_125' 'May11-11-50_CIFAR10_adf3aac7c7_222' 'May11-11-50_CIFAR10_adf3aac7c7_804')
   # runnames=('May11-19-15_CIFAR10_adf3aac7c7_412' 'May11-19-15_CIFAR10_adf3aac7c7_149')
   # runnames=('May11-22-05_CIFAR10_adf3aac7c7_524' 'May11-22-05_CIFAR10_adf3aac7c7_456' 'May11-22-06_CIFAR10_adf3aac7c7_685' 'May11-22-06_CIFAR10_adf3aac7c7_731')
-  runnames=('May12-08-19_CIFAR10_adf3aac7c7_89' 'May12-08-19_CIFAR10_adf3aac7c7_676' 'May12-08-19_CIFAR10_adf3aac7c7_16' 'May12-08-19_CIFAR10_adf3aac7c7_160')
+  # runnames=('May12-08-19_CIFAR10_adf3aac7c7_89' 'May12-08-19_CIFAR10_adf3aac7c7_676' 'May12-08-19_CIFAR10_adf3aac7c7_16' 'May12-08-19_CIFAR10_adf3aac7c7_160')
+  # runnames=('May13-08-23_CIFAR10_367d0e639c_837' 'May13-08-24_CIFAR10_367d0e639c_157' 'May13-08-24_CIFAR10_367d0e639c_438' 'May13-08-24_CIFAR10_367d0e639c_898' )
+  # runnames=('May15-11-23_CIFAR10_367d0e639c_623')
+  # runnames=('May15-18-17_CIFAR10_367d0e639c_588')
+  # runnames=('May16-09-00_CIFAR10_367d0e639c_19')
+  # runnames=('May16-12-59_CIFAR10_367d0e639c_526')
+  # runnames=('May17-07-26_CIFAR10_367d0e639c_180')
+  # runnames=('May17-14-39_CIFAR10_367d0e639c_577')
+  # runnames=('May18-13-25_CIFAR10_367d0e639c_715')
+  runnames=('May18-14-10_imagenet_367d0e639c_279')
+
   runname="${runnames[$SLURM_ARRAY_TASK_ID]}"
   configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
   # methods=('SLVanilla' 'BP' 'FA') # ('SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')

@@ -857,16 +857,23 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
            
         # compute output
         latents, output = modelF(images)
-
         losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
 
         # compute gradient and do SGD step
         optimizerF.zero_grad()
-        optimizerFB_local.zero_grad()
+        
         losse.backward()
         optimizerF.step()
+
+        optimizerFB_local.zero_grad()
+        optimizerF.zero_grad()
+        latents, output = modelF(images)
+        losse = criterione(output, target)
+        losse.backward()
         optimizerFB_local.step()
-        #schedulerF.step()
+        optimizerF.step()
+
+
         if args.method == 'BP':
             modelF.load_state_dict(toggle_state_dict_YYtoBP(modelF.state_dict(), modelF.state_dict()))
 
