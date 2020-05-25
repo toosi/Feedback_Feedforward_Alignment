@@ -307,7 +307,9 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.lossfuncB == 'MSELoss':                                                                                       
         criteriond = nn.MSELoss().cuda(args.gpu)
     elif args.lossfuncB == 'SSIM':
-        criteriond = pytorch_ssim.SSIM(window_size = int(input_size/10))
+        criteriond = pytorch_ssim.SSIM(window_size = int(input_size/10)).cuda(args.gpu)
+    elif args.lossfuncB == 'TripletMarginLoss':
+        criteriond = nn.TripletMarginLoss().cuda(args.gpu)
 
     if 'fixup' in args.arche:
         parameters_bias = [p[1] for p in modelF.named_parameters() if 'bias' in p[0]]
@@ -901,8 +903,13 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             reference = F.interpolate(reference, size=gener.shape[-1])
 
             # gamma = 10e-4
+            if args.lossfuncB == 'TripletMarginLoss':
 
-            lossd = criteriond(gener, reference) + args.gamma * nn.MSELoss()(gener,torch.zeros_like(gener)) #+ criterione(modelF(pooled), target)
+                shuffled_batch = reference[torch.randperm(reference.shape[0])]
+                lossd = criteriond(gener, reference, shuffled_batch)
+            else:
+                lossd = criteriond(gener, reference) #+ args.gamma * nn.MSELoss()(gener,torch.zeros_like(gener)) #+ criterione(modelF(pooled), target)
+
             # measure correlation and record loss
             pcorr = correlation(gener, reference)
             losses.update(lossd.item(), images.size(0))
@@ -1044,7 +1051,12 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             if  'SLAdvCost' in args.method:
                 lossd = criteriond(gener, reference)-criterione(output_gener,target) #+ criterione(modelF(pooled), target)
             else:
-                lossd = criteriond(gener, reference)
+                if args.lossfuncB == 'TripletMarginLoss':
+                
+                    shuffled_batch = reference[torch.randperm(reference.shape[0])]
+                    lossd = criteriond(gener, reference, shuffled_batch)
+                else:
+                    lossd = criteriond(gener, reference) #
 
             # measure correlation and record loss
             pcorr = correlation(gener, reference)
@@ -1253,11 +1265,22 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
             
             reference = F.interpolate(reference, size=gener.shape[-1])
 
-            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)       
+            if args.lossfuncB == 'TripletMarginLoss':
+                
+                shuffled_batch = reference[torch.randperm(reference.shape[0])]
+                lossd = criteriond(gener, reference, shuffled_batch)
+            else:
+                lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)       
             
 
             latents_gener, output_gener = modelF(F.interpolate(recons, size=images.shape[-1]).detach())
-            lossL = criteriond(latents_gener, latents.detach())
+            if args.lossfuncB == 'TripletMarginLoss':
+                shuffled_images = images[torch.randperm(images.shape[0])]
+                latents_shuffled, output = modelF(shuffled_images)
+
+                lossL = criteriond(latents_gener, latents.detach(), latents_shuffled.detach())
+            else:
+                lossL = criteriond(latents_gener, latents.detach())
 
             pcorr = correlation(gener, reference)
             losses.update(lossd.item(), images.size(0))
