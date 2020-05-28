@@ -147,12 +147,11 @@ class ConvAsymFunc(autograd.Function):
         grad_stride = grad_padding = grad_groups = grad_dilation = None
 
         if context.needs_input_grad[0]:
-            # all of the logic of FA resides in this one line
-            # calculate the gradient of input with fixed fa tensor, rather than the "correct" model weight
+            
             grad_input = nn.grad.conv2d_input(inputs.shape, weight_feedback, grad_output, stride, padding, dilation, groups)
         
         if context.needs_input_grad[1]:
-            # copied from nn.grad on master becuase of a wired error of torch.narrow            
+            # copied from nn.grad on master becuase of a wierd error of torch.narrow            
             stride = _pair(stride)
             padding = _pair(padding)
             dilation = _pair(dilation)
@@ -183,8 +182,8 @@ class ConvAsymFunc(autograd.Function):
         if context.needs_input_grad[2]:
             if algorithm_id == 0 : #FA
                 grad_weight_feedback = weight_feedback-weight_feedback
-            elif algorithm_id == 1: #Info_align 
-                primitive_weights = torch.tensor([0,0,0])
+            elif algorithm_id == 1: #Info_align   
+
                 alpha = primitive_weights[0].to(weight.device) #0.3
                 beta = primitive_weights[1].to(weight.device) #0.02
                 gamma = primitive_weights[2].to(weight.device) #3*10e-6  
@@ -197,6 +196,7 @@ class ConvAsymFunc(autograd.Function):
                 # insn2 = nn.InstanceNorm2d(weight_feedback.shape[1])
                 #F.normalize(dim=1)
 
+
                 net_local = nn.Sequential(m1, bn1, nn.ReLU(), m2).to(weight.device)
                 criterion_recons = nn.MSELoss()
                 xl = inputs.detach().clone()
@@ -206,6 +206,7 @@ class ConvAsymFunc(autograd.Function):
                 # [print(k, t.shape) for k,t in net_local.state_dict().items()]
                 # print('-----------------') 
                 # print('permuted 0.weight:', weight.permute(1, 0, 2, 3).shape,'3.weight:', weight_feedback.shape)
+
                 state_dict = {'0.weight': weight, '3.weight': weight_feedback } #torch.flip
                 
                 net_local.load_state_dict(state_dict)
@@ -213,6 +214,7 @@ class ConvAsymFunc(autograd.Function):
                 # print('net_local', net_local)
                 with torch.enable_grad():
                     output_local = net_local(xl)
+
                     output_local = output_local/ torch.norm(output_local)
                     loss_amp = criterion_recons(F.interpolate(output_local,size=xl.shape[-1]), xl)
                     loss_null = criterion_recons(output_local, torch.zeros_like(output_local).to(output_local.device))
