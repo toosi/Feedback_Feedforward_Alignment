@@ -445,8 +445,8 @@ else:
     axes[0,0].set_title('First layer')
     axes[0,1].set_title('Last layer')
 
-    axes[1,0].set_xticks([])
-    axes[1,0].set_yticks([])
+    # axes[1,0].set_xticks([])
+    # axes[1,0].set_yticks([])
 
     fig.suptitle('%s dataset %s '%(args.dataset, args.runname), y=0.92)
 

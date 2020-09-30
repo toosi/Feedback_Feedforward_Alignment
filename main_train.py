@@ -320,7 +320,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 {'params': parameters_scale, 'lr': args.lrF/10.}, 
                 {'params': parameters_others}], 
                 lr=args.lrF, 
-                momentum=args.momentum, 
+                momentum=args.momentumF, 
                 weight_decay=args.wdF)
                                     
 
@@ -332,7 +332,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 {'params': parameters_scale, 'lr': args.lrB/10.}, 
                 {'params': parameters_others}], 
                 lr=args.lrB, 
-                momentum=args.momentum, 
+                momentum=args.momentumB, 
                 weight_decay=args.wdB) 
 
     else:
@@ -362,12 +362,10 @@ def main_worker(gpu, ngpus_per_node, args):
         else:
             
             optimizerF = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
-                                    momentum=args.momentum,
-                                    weight_decay=args.wdF,
-                                    
-                                    )
+                                    momentum=args.momentumF,
+                                    weight_decay=args.wdF,)
             optimizerF3 = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
-                        momentum=args.momentum,
+                        momentum=args.momentumF,
                         weight_decay=args.wdF)
 
         if 'Adam' in args.optimizerB:                       
@@ -377,7 +375,7 @@ def main_worker(gpu, ngpus_per_node, args):
                                         weight_decay=args.wdB) 
         else:
             optimizerB = getattr(torch.optim,args.optimizerB)(list_paramsB, args.lrB,
-                                momentum=args.momentum,
+                                momentum=args.momentumB,
                                 weight_decay=args.wdB)
     
     schedulerF = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerF, 'max', patience=args.patiencee, factor=args.factore)
@@ -774,8 +772,6 @@ def main_worker(gpu, ngpus_per_node, args):
             # remember best acc@1 and save checkpoint
             is_beste = acce > best_acce
             best_acce = max(acce, best_acce)
-        
-            
 
             if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                     and args.rank % ngpus_per_node == 0):

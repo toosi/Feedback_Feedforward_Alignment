@@ -114,8 +114,11 @@ parser.add_argument('--factord', '--factord-scheduler', default=0.1, type=float,
                     metavar='FacD', help='factor in scheduler decoder', dest='factord')
 
 
-parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
-                    help='momentum')
+parser.add_argument('--momentumF', default=0.9, type=float, metavar='MF',
+                    help='momentum forward')
+parser.add_argument('--momentumB', default=0.9, type=float, metavar='MB',
+                    help='momentum backward')
+
 parser.add_argument('--wdF', '--weight-decayF', default=1e-7, type=float,
                     metavar='W', help='weight decay (default: 1e-5)',
                     dest='wdF')
@@ -282,7 +285,7 @@ if 'fixup' in args.arche:
             {'params': parameters_scale, 'lr': args.lrF/10.}, 
             {'params': parameters_others}], 
             lr=args.lrF, 
-            momentum=args.momentum, 
+            momentum=args.momentumF, 
             weight_decay=args.wdF)
                                 
 
@@ -294,7 +297,7 @@ if 'fixup' in args.arche:
             {'params': parameters_scale, 'lr': args.lrB/10.}, 
             {'params': parameters_others}], 
             lr=args.lrB, 
-            momentum=args.momentum, 
+            momentum=args.momentumB, 
             weight_decay=args.wdB) 
     
     parameters_bias = [p[1] for p in modelC.named_parameters() if 'bias' in p[0]]
@@ -305,7 +308,7 @@ if 'fixup' in args.arche:
             {'params': parameters_scale, 'lr': args.lrF/10.}, 
             {'params': parameters_others}], 
             lr=args.lrF, 
-            momentum=args.momentum, 
+            momentum=args.momentumF, 
             weight_decay=args.wdF)
 
 else:
@@ -334,12 +337,12 @@ else:
         optimizerF = getattr(optim, args.optimizerF)(list_paramsF,  lr=args.lrF, weight_decay=args.wdF)
         optimizerC = getattr(optim, args.optimizerF)(list_paramsC,  lr=args.lrF, weight_decay=args.wdF)
     else:
-        optimizerF = getattr(optim, args.optimizerF)(list_paramsF,  lr=args.lrF, weight_decay=args.wdF, momentum=args.momentum)
-        optimizerC = getattr(optim, args.optimizerF)(list_paramsC,  lr=args.lrF, weight_decay=args.wdF, momentum=args.momentum)
+        optimizerF = getattr(optim, args.optimizerF)(list_paramsF,  lr=args.lrF, weight_decay=args.wdF, momentum=args.momentumF)
+        optimizerC = getattr(optim, args.optimizerF)(list_paramsC,  lr=args.lrF, weight_decay=args.wdF, momentum=args.momentumF)
     if 'Adam' in args.optimizerB:
         optimizerB = getattr(optim, args.optimizerB)(list_paramsB,  lr=args.lrB, weight_decay=args.wdB)
     else:
-        optimizerB = getattr(optim, args.optimizerB)(list_paramsB,  lr=args.lrB, weight_decay=args.wdB, momentum=args.momentum)
+        optimizerB = getattr(optim, args.optimizerB)(list_paramsB,  lr=args.lrB, weight_decay=args.wdB, momentum=args.momentumB)
 
 # schedulerF = optim.lr_scheduler.MultiStepLR(optimizerF, np.arange(0, args.epochs, args.step),args.drop)
 # schedulerB = optim.lr_scheduler.MultiStepLR(optimizerB, np.arange(args.offset, args.epochs, args.step),args.drop)
