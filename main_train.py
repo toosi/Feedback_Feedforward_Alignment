@@ -65,6 +65,8 @@ elif socket.gethostname() == 'SYNPAI':
     path_prefix = '/hdd6gig/Documents/Research'
 elif socket.gethostname()[0:2] == 'ax':
     path_prefix = '/home/tt2684/Research'
+elif socket.gethostname() == 'turing':
+    path_prefix = '/home/tahereh/Documents/Research'
 
 parser = argparse.ArgumentParser(description='PyTorch Training')
 parser.add_argument(
@@ -107,40 +109,13 @@ elif args.arche.startswith('resnet'):
     from models import resnets as custom_models
     #just for compatibality
     toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
+elif  'FullyConnected' in args.arche:
+    toggle_state_dict = state_dict_utils.toggle_state_dict
+
+    from models import custom_models
 
 toggle_state_dict_YYtoBP = state_dict_utils.toggle_state_dict_YYtoBP
 
-# project = 'SYY2020' #'SYY-MINST'
-# # ---------- path to save data and models
-# #print(socket.gethostname())
-# if socket.gethostname()[0:4] in  ['node','holm','wats']:
-#     path_prefix = '/rigel/issa/users/Tahereh/Research'
-# elif socket.gethostname() == 'SYNPAI':
-#     path_prefix = '/hdd6gig/Documents/Research'
-# elif socket.gethostname()[0:2] == 'ax':
-#     path_prefix = '/scratch/issa/users/tt2684/Research'
-# arch = 'E%sD%s'%(args.arche, args.archd)
-# # rundatetime = args.time#datetime.now().strftime('%b%d_%H-%M')
-
-# run_id = args.runname #'%s_%s_%s'%(rundatetime, commit.split('_')[0], socket.gethostname()[0:4] )
-
-# tensorboarddir = path_prefix + '/Results/Tensorboard_runs/runs'+'/%s/'%project +run_id
-# args.path_prefix = path_prefix
-# args.path_save_model = path_prefix+'/Models/%s_trained/%s/%s/%s/'%(args.dataset,project,arch,run_id)
-# #print(args.path_save_model)
-# # args.databasedir = path_prefix+'/Results/database/%s/%s/%s/'%(project,arch,args.dataset)
-# imagesetdir = path_prefix+'/Data/%s/'%args.dataset
-# customdatasetdir_train = path_prefix+'/Data/Custom_datasets/%s/'%args.dataset
-# path_list = [args.path_save_model, args.databasedir, imagesetdir,customdatasetdir_train, tensorboarddir]
-
-
-
-# for path in path_list:
-#     if not(os.path.exists(path)):
-#         try:
-#             os.makedirs(path)
-#         except FileExistsError:
-#             pass
 
 best_acce = 0
 best_lossd = 10
@@ -298,8 +273,14 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
         args.algorithm = args.method
         modelidentifier = 'F'
-    modelF = get_model(args.arche, args.gpu, {'algorithm': args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}) #, 'primitive_weights':args.primitive_weights, 'woFullyConnected':True
-    modelB = get_model(args.archd, args.gpu, {'algorithm': 'FA','base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes})
+    if 'FullyConnected' in args.arche:
+        kwargs_asym = {'algorithm':'FA', 'hidden_layers':[784, 256, 256,10], 'nonlinearfunc':'relu', 'input_length':1024}
+    else:
+        kwargs_asym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
+
+
+    modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_asym)).cuda() #Forward().cuda() # main model
+    modelB = nn.parallel.DataParallel(getattr(custom_models, args.archd)(**kwargs_asym)).cuda() # backward network to compute gradients for modelF
 
     
     # define loss function (criterion) and optimizer

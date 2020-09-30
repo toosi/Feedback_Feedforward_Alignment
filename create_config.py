@@ -23,10 +23,6 @@ import matplotlib.pylab as plt
 
 from utils import state_dict_utils
 
-#%%
-
-
-
 
 model_names = sorted(name for name in torchmodels.__dict__
     if name.islower() and not name.startswith("__")
@@ -44,14 +40,14 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
 parser.add_argument('-ae', '--arche', metavar='ARCHE', default='ConvDiscr',
                     choices=model_names+['autoencoder','SeeSaw','See','Saw', 'ResNet18F','AsymResNet10F',\
                          'AsymResNet18F','AsymResNet18FNoBN', 'FCDiscrNet',
-                         'AsymResLNet10FNoMaxP', 'fixup_resnet20', 'fixup_resnet14','AsymResLNet10F','AsymResLNet14F','AsymResLNetLimited10F','AsymResLNetLimited14F','asymresnet18','resnet18c'],
+                         'AsymResLNet10FNoMaxP', 'fixup_resnet20', 'fixup_resnet14','AsymResLNet10F','AsymResLNet14F','AsymResLNetLimited10F','AsymResLNetLimited14F','asymresnet18','resnet18c', 'FullyConnectedF'],
                     help='model architecture: ' +
                         ' | '.join(model_names) +
                         ' (default: resnet18)')
 parser.add_argument('-ad', '--archd', metavar='ARCHD', default='ConvGene',
                     choices=model_names+['autoencoder','SeeSaw','See','Saw', 'ResNet18B','AsymResNet18B','AsymResNet10B',\
                         'AsymResNet18BUpsamp','AsymResNet18BNoBN', 'FCGeneNet','AsymResLNet10BNoMaxP',
-                        'AsymResNet18BNoMaxPLessReLU', 'fixup_resnetT20','fixup_resnetT14','AsymResLNet10B','AsymResLNet14B','asymresnetT18','resnet18c'],
+                        'AsymResNet18BNoMaxPLessReLU', 'fixup_resnetT20','fixup_resnetT14','AsymResLNet10B','AsymResLNet14B','asymresnetT18','resnet18c', 'FullyConnectedB'],
                     help='model architecture: ' +
                         ' | '.join(model_names) +
                         ' (default: resnet18)')
@@ -79,6 +75,8 @@ elif socket.gethostname() == 'SYNPAI':
     path_prefix = '/hdd6gig/Documents/Research'
 elif socket.gethostname()[0:2] == 'ax':
     path_prefix = '/home/tt2684/Research'
+elif socket.gethostname() == 'turing':
+    path_prefix = '/home/tahereh/Documents/Research'
 
 
 parser.add_argument('--base_channels', default=64, type=int, metavar='N',
@@ -175,6 +173,11 @@ elif args.arche.startswith('resnet'):
     from models import resnets as custom_models
     #just for compatibality
     toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
+elif  'FullyConnected' in args.arche:
+    toggle_state_dict = state_dict_utils.toggle_state_dict
+
+    from models import custom_models
+
 
 toggle_state_dict_YYtoBP = state_dict_utils.toggle_state_dict_YYtoBP
 
@@ -258,11 +261,21 @@ if 'MNIST' in args.dataset:
     image_channels = 1
 else:
     image_channels = 3
-    
-modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(algorithm='FA', base_channels=args.base_channels, image_channels=image_channels, n_classes=args.n_classes)).cuda() #Forward().cuda() # main model
-modelB = nn.parallel.DataParallel(getattr(custom_models, args.archd)(algorithm='FA', base_channels=args.base_channels, image_channels=image_channels, n_classes=args.n_classes)).cuda() # backward network to compute gradients for modelF
 
-modelC = nn.parallel.DataParallel(getattr(custom_models, args.arche)(algorithm='BP', base_channels=args.base_channels, image_channels=image_channels, n_classes=args.n_classes)).cuda() # Forward Control model to compare to BP
+if 'FullyConnected' in args.arche:
+    kwargs_asym = {'algorithm':'FA', 'hidden_layers':[784, 256, 256,10], 'nonlinearfunc':'relu', 'input_length':1024}
+else:
+    kwargs_asym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
+
+
+modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_asym)).cuda() #Forward().cuda() # main model
+modelB = nn.parallel.DataParallel(getattr(custom_models, args.archd)(**kwargs_asym)).cuda() # backward network to compute gradients for modelF
+if 'FullyConnected' in args.arche:
+    kwargs_sym = {'algorithm':'BP', 'hidden_layers':[784, 256, 256,10], 'nonlinearfunc':'relu', 'input_length':1024}
+else:
+    kwargs_sym = {'algorithm':'BP', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
+
+modelC = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_sym)).cuda() # Forward Control model to compare to BP
 
 
 # print(modelC.state_dict().keys())

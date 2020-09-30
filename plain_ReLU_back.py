@@ -164,12 +164,11 @@ class AsymResLNet10F(nn.Module):
 
     def forward(self, x):
         
-        x = self.conv1(x)
-        
+        x = self.conv1(x)     
         x = self.bn1(x)
         xrelu0 = x
         x = self.relu(x) #self.relu(self.bn1(x))
-        
+
 
         # layer 1
         identity = x
@@ -178,7 +177,6 @@ class AsymResLNet10F(nn.Module):
         x = self.bn11(x)
         xrelu11 = x
         x = self.relu(x)
-        
         x = self.conv12(x)
         x = self.bn12(x)
         xrelu12 = x
@@ -189,7 +187,6 @@ class AsymResLNet10F(nn.Module):
         x = self.bn21(x)
         xrelu13 = x
         x = self.relu(x)
-        
         x = self.conv22(x)
         x = self.bn22(x)
         x += self.bn23(self.downsample1(identity)) 
