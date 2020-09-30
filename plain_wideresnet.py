@@ -130,11 +130,14 @@ class WideResNet(nn.Module):
         # 2nd block
         self.block2 = NetworkBlock(n, nChannels[1], nChannels[2], block, 2, dropRate, algorithm=algorithm)
         # 3rd block
-        self.block3 = NetworkBlock(n, nChannels[2], nChannels[3], block, 2, dropRate, algorithm=algorithm)
+        self.block3 = NetworkBlock(n, nChannels[2], num_classes, block, 2, dropRate, algorithm=algorithm)
         # global average pooling and classifier
-        self.bn1 = nn.BatchNorm2d(nChannels[3], affine=False, track_running_stats=False)
+        self.bn1 = nn.BatchNorm2d(num_classes, affine=False, track_running_stats=False)
         self.relu = nn.ReLU(inplace=True)
-        self.fc = Linear(nChannels[3], num_classes, algorithm=algorithm)
+        # self.fc = Linear(nChannels[3], num_classes, algorithm=algorithm)
+        # self.conv2 = Conv2d(nChannels[3], num_classes, kernel_size=1, stride=1,
+        #                        padding=0, bias=False, algorithm=algorithm)
+        self.pool = nn.AdaptiveAvgPool2d(1)
         self.nChannels = nChannels[3]
 
         for m in self.modules():
@@ -149,13 +152,20 @@ class WideResNet(nn.Module):
                     m.bias.data.zero_()
     def forward(self, x):
         out = self.conv1(x)
-        out = self.block1(out)
-        out = self.block2(out)
-        out = self.block3(out)
-        latents = self.relu(self.bn1(out))
-        out = F.avg_pool2d(latents, 8)
-        out = out.view(-1, self.nChannels)
-        return latents, self.fc(out)
+
+        out1 = self.block1(out)
+        out2 = self.block2(out1)
+        out3 = self.block3(out2)
+        latents = self.relu(self.bn1(out3))
+
+        # out = F.avg_pool2d(latents, 8)
+        # out = out.view(-1, self.nChannels)
+        # out = self.fc(out)
+        
+        # out = self.conv2(latents)
+        out = self.pool(latents)
+        
+        return out1, out2, out3, latents, out.squeeze()
 
 
 
@@ -181,7 +191,9 @@ class BasicBlockT(nn.Module):
         # if not self.equalInOut:
         #     x = self.conv2(x)
         # else:
-        out = self.conv2(x)  
+        
+        out = self.conv2(x)
+        
 
         if self.droprate > 0:
             out = F.dropout(out, p=self.droprate, training=self.training)
@@ -218,11 +230,13 @@ class WideResNetT(nn.Module):
         # 2nd block
         self.block2 = NetworkBlockT(n, nChannels[1], nChannels[2], block, 2, dropRate, algorithm=algorithm)
         # 3rd block
-        self.block3 = NetworkBlockT(n, nChannels[2], nChannels[3], block, 2, dropRate, algorithm=algorithm)
+        self.block3 = NetworkBlockT(n, nChannels[2], num_classes, block, 2, dropRate, algorithm=algorithm)
         # global average pooling and classifier
-        self.bn1 = nn.BatchNorm2d(nChannels[3], affine=False, track_running_stats=False)
+        self.bn1 = nn.BatchNorm2d(num_classes, affine=False, track_running_stats=False)
         self.relu = nn.ReLU(inplace=True)
-        self.fc = Linear(num_classes, nChannels[3], algorithm=algorithm)
+        # self.fc = Linear(num_classes, nChannels[3], algorithm=algorithm)
+        # self.conv2 = ConvTranspose2d(num_classes, nChannels[3], kernel_size=1, stride=1,
+        #                        padding=0, bias=False, algorithm=algorithm)
         self.nChannels = nChannels[3]
 
         for m in self.modules():
@@ -235,20 +249,21 @@ class WideResNetT(nn.Module):
             elif isinstance(m, Linear):
                 if m.bias is not None:
                     m.bias.data.zero_()
-    def forward(self, x):
+    def forward(self, x): #, out3, out2, out1
 
         # out = self.fc(x)
         # out = out.view(-1, self.nChannels, 1, 1)
         # out = F.interpolate(out, 8)
-        # out = self.relu(self.bn1(x)) #removing this incread test performance
-        out = self.block3(x)
-        out = self.block2(out)
-        out = self.block1(out)
-        out = self.conv1(out)
+        # out = self.relu(self.bn1(x)) #removing this increased test performance
+
+        out3 = self.block3(x)   #out = self.block3(x+out3)
+        out2 = self.block2(out3)  #out = self.block2(out2+F.pad(out, (0,1,0,1), mode='constant'))
+        out1 = self.block1(out2)   # out = self.block1(out1+F.pad(out, (0,1,0,1), mode='constant'))
+        out = self.conv1(out1)
 
         out = self.relu(self.bn1(out))
          
-        return out
+        return x, out3, out2, out1, out 
 
 #***************************************************************
 
@@ -437,12 +452,12 @@ transform_test = transforms.Compose([
 trainset = torchvision.datasets.CIFAR10(
     root='/hdd6gig/Documents/Research/Data/CIFAR10/', train=True, download=True, transform=transform_train)
 trainloader = torch.utils.data.DataLoader(
-    trainset, batch_size=128, shuffle=True, num_workers=2)
+    trainset, batch_size=128, shuffle=True, num_workers=8)
 
 testset = torchvision.datasets.CIFAR10(
     root='/hdd6gig/Documents/Research/Data/CIFAR10/', train=False, download=True, transform=transform_test)
 testloader = torch.utils.data.DataLoader(
-    testset, batch_size=128, shuffle=False, num_workers=2)
+    testset, batch_size=128, shuffle=False, num_workers=8)
 
 classes = ('plane', 'car', 'bird', 'cat', 'deer',
            'dog', 'frog', 'horse', 'ship', 'truck')
@@ -476,7 +491,7 @@ if device == 'cuda':
 
 
 # inputs = torch.rand(1, 3,32,32).to(device)
-# outputs = net(inputs)
+# outputs, latents = net(inputs)
 # recons = netB(outputs)
 # netB.load_state_dict(toggle_state_dict_wresnets(net.state_dict()))
 
@@ -494,10 +509,13 @@ list_params = [p for n,p in list(net.named_parameters()) if 'feedback' not in n]
 optimizer = optim.SGD(list_params, lr=args.lr,
                     momentum=0.9, weight_decay=5e-4)
 
-criteriond = nn.TripletMarginLoss()# 
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1, last_epoch=-1)
+
+criteriond = nn.MSELoss() #nn.TripletMarginLoss()# 
 list_paramsd = [p for n,p in list(netB.named_parameters()) if 'feedback' not in n]
 optimizerd = optim.Adam(list_paramsd, lr=args.lr/100,
                       weight_decay=5e-4)
+# schedulerd = torch.optim.lr_scheduler.StepLR(optimizerd, step_size=10, gamma=0.1, last_epoch=-1)
 
 # Training
 def train(epoch):
@@ -511,7 +529,13 @@ def train(epoch):
         inputs, targets = inputs.to(device), targets.to(device)
 
 
-        # ****** SL operations ******** 
+        
+
+    # for batch_idx, (inputs, targets) in enumerate(trainloader):
+
+    #     inputs, targets = inputs.to(device), targets.to(device)
+
+    # ****** SL operations ******** 
         if method == 'SL':
             netB.eval()
             net.eval()
@@ -519,10 +543,16 @@ def train(epoch):
             
             netB.train()
             optimizerd.zero_grad()
-            latents, outputs = net(inputs)
-            recons = netB(latents.detach())
-            shuffled = inputs[torch.randperm(inputs.shape[0])]
-            lossd = criteriond(F.interpolate(recons, size=inputs.shape[-1]), inputs, -shuffled)
+            out1, out2, out3, latents, out = net(inputs)
+            rout0, rout1, rout2, rout3 ,recons = netB(latents.detach())
+            # shuffled = inputs[torch.randperm(inputs.shape[0])]
+            # lossd = criteriond(F.interpolate(recons, size=inputs.shape[-1]), inputs) #, shuffled)
+            recons = F.pad(recons, (1,2,1,2), mode='constant')
+            rout3 = F.pad(rout3, (0,1,0,1), mode='constant')
+            rout2 = F.pad(rout2, (0,1,0,1), mode='constant')
+            rout1 = F.pad(rout1, (0,1,0,1), mode='constant')
+            # rout0 = F.pad(rout0, (0,1,0,1), mode='constant')
+            lossd =  criteriond(recons, inputs) #criteriond(rout1, out2)  +  #+ + criteriond(rout1, out1)
             lossd.backward()
             optimizerd.step()
 
@@ -533,25 +563,21 @@ def train(epoch):
             train_lossd += lossd.item()
          # ****************************
 
-    for batch_idx, (inputs, targets) in enumerate(trainloader):
-
-        inputs, targets = inputs.to(device), targets.to(device)
         net.train()
         optimizer.zero_grad()
-        latents, outputs = net(inputs)
+        out1, out2, out3, latents, out = net(inputs)
         
-        loss = criterion(outputs, targets)
+        loss = criterion(out, targets)
         loss.backward()
         optimizer.step()
-        
-        
 
         train_loss += loss.item()
 
-        _, predicted = outputs.max(1)
+        _, predicted = out.max(1)
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
 
+        
         progress_bar(batch_idx, len(trainloader), 'Loss: %.4f | Acc: %.3f%% (%d/%d)'
                      % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
 
@@ -566,7 +592,7 @@ def test(epoch):
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(testloader):
             inputs, targets = inputs.to(device), targets.to(device)
-            _, outputs = net(inputs)
+            _,_,_,_, outputs = net(inputs)
             loss = criterion(outputs, targets)
 
             test_loss += loss.item()
@@ -593,6 +619,8 @@ def test(epoch):
 
 
 for epoch in range(start_epoch, start_epoch+200):
+
     train(epoch)
     test(epoch)
+    scheduler.step()
 

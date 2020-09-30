@@ -75,9 +75,13 @@ if [ $config == 0 ]
   # runname="${runnames[$SLURM_ARRAY_TASK_ID]}"
 
 
-  runname='May28-13-58_CIFAR10_9fb773a12e_242'
+
+  runname=May25-09-00_CIFAR10_b784081472_181
+  # configpath="/home/tahereh/Documents/Research/Results/Symbio/Symbio/$runname/configs.yml"
   configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
-  methods=('SLError' 'SLAdvImg' 'SLLatentRobust')  #('SLVanilla' 'BP' 'FA') # 'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
+  methods=('SLVanilla' 'BP' 'FA') # ('SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
+
+
   # methods=('SLAdvImgCC0' 'SLAdvCostCC0' 'BPCC0' 'FACC0' 'SLVanillaCC0' 'SLErrorCC0' )
   # methods=('BPCC1' 'FACC1' 'SLVanillaCC1' 'SLErrorCC1' 'SLAdvImgCC1' 'SLAdvCostCC1')
   # methods=('BP' 'FA' 'SLVanilla' 'SLLatentRobust' 'SLAdvImg' 'SLError')
