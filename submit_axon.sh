@@ -2,8 +2,8 @@
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
 #SBATCH -c 20
-#SBATCH --gres=gpu:4
-#SBATCH --mem=40gb
+#SBATCH --gres=gpu:2
+#SBATCH --mem=20gb
 #SBATCH --array=0-2
 #SBATCH --time=5-00:00:00
 
@@ -20,7 +20,8 @@ module load anaconda3-2019.03
 source activate /home/tt2684/conda-envs/pytorch_tensorflow_latest
 
 now=$(date +'%Y-%m-%d_%H-%M')
-note='**Revisit_AsymResLNet10F_Triplet_Loss**'
+note='**Fully_COnnected**'
+# Revisit_Asymresnet_AffineFalse
 # imagenet_with_modified_resnets_wobn1_trackFalse_wolastAcc
 # Cycle_Consistency AdvTrainingFGSM_epsilon0.2_withOUTSperateOptimizerscheduler
 # AdvTrainingFGSM_epsilon0.2_withscheduler
@@ -32,7 +33,10 @@ printf "********************************************************** \n"
 
 ####Command to execute Python program
 config=0
-init='May09-13-40_CIFAR10_adf3aac7c7_866' # use: -loadinitialization $init
+# init='May25-14-32_CIFAR10_9fb773a12e_987' # use: -loadinitialization $init
+#Fully Connected
+# python -u create_config.py -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 200 -ae FullyConnectedF -ad FullyConnectedB --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 0.8e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-5 --patiencee 20 --patienced 15 -p 100 --note  $note ; config=1 
+
 # python -u create_config.py -dataset imagenet  -j 4 --input_size 224  --batch-size 256 --epoch 500 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-1 --lrB 1e-3 --wdF 1e-4 --wdB 1e-6 --patiencee 10 --patienced 8 -p 100 --note  $note ; config=1  #
 # python -u create_config.py -dataset CIFAR10   -j 4  --gamma 0  --input_size 32 --base_channels 64 --batch-size 256 --epoch 1000 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'SGD' --lrF 1e-1 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 # python -u create_config.py -dataset MNIST  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 150 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
@@ -44,7 +48,7 @@ init='May09-13-40_CIFAR10_adf3aac7c7_866' # use: -loadinitialization $init
 # lrF=0.001
 # for gamma in "${gammas[@]}"
 # do
-# python -u create_config.py  -dataset CIFAR10 --lossfuncB TripletMarginLoss  -j 24  --input_size 32  --batch-size 256 --epoch 1000 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF $optimizerF --optimizerB $optimizerB --lrF $lrF --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py  -dataset CIFAR10   -j 24  --input_size 32  --batch-size 256 --epoch 1000 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF $optimizerF --optimizerB $optimizerB --lrF $lrF --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --momentumF 0.9 --momentumB 0.9 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 # done
 
 # python -u create_config.py -dataset imagenet  -j 4 --input_size 224  --batch-size 64 --epoch 100 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF 'Adam' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 10 --patienced 8 -p 100 --note  $note ; config=1  #
@@ -75,17 +79,19 @@ if [ $config == 0 ]
   # runname="${runnames[$SLURM_ARRAY_TASK_ID]}"
 
 
-  runname=May25-09-00_CIFAR10_b784081472_181
+
+  runname=Sep30-14-41_MNIST_4c4b77d125_237 # Sep30-11-43_MNIST_4c4b77d125_516   #May25-09-00_CIFAR10_b784081472_181
   # configpath="/home/tahereh/Documents/Research/Results/Symbio/Symbio/$runname/configs.yml"
   configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
   methods=('SLVanilla' 'BP' 'FA') # ('SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
+
 
   # methods=('SLAdvImgCC0' 'SLAdvCostCC0' 'BPCC0' 'FACC0' 'SLVanillaCC0' 'SLErrorCC0' )
   # methods=('BPCC1' 'FACC1' 'SLVanillaCC1' 'SLErrorCC1' 'SLAdvImgCC1' 'SLAdvCostCC1')
   # methods=('BP' 'FA' 'SLVanilla' 'SLLatentRobust' 'SLAdvImg' 'SLError')
   python -u main_train.py   --config-file $configpath --method "${methods[$SLURM_ARRAY_TASK_ID]}"
   
-  # python -u main_train.py --method 'SLVanilla'  --config-file $configpath
+  # python -u main_train.py --method 'SLError'  --config-file $configpath
 
   # printf " $methods \n"
   # SLConv1 needs to be run in one gpu because of hooks
