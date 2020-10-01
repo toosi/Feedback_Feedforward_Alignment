@@ -39,9 +39,9 @@ init='May09-13-40_CIFAR10_adf3aac7c7_866' # use: -loadinitialization $init
 
 # gammas=(1e-10 1e-5 1e-0 1e1) --primitive_weights $alpha $beta $gamma
 
-optimizerB='RMSprop'
-optimizerF='RMSprop'
-lrF=0.001
+# optimizerB='RMSprop'
+# optimizerF='RMSprop'
+# lrF=0.001
 # for gamma in "${gammas[@]}"
 # do
 # python -u create_config.py  -dataset CIFAR10 --lossfuncB TripletMarginLoss  -j 24  --input_size 32  --batch-size 256 --epoch 1000 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF $optimizerF --optimizerB $optimizerB --lrF $lrF --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
@@ -83,7 +83,7 @@ if [ $config == 0 ]
   # methods=('SLAdvImgCC0' 'SLAdvCostCC0' 'BPCC0' 'FACC0' 'SLVanillaCC0' 'SLErrorCC0' )
   # methods=('BPCC1' 'FACC1' 'SLVanillaCC1' 'SLErrorCC1' 'SLAdvImgCC1' 'SLAdvCostCC1')
   # methods=('BP' 'FA' 'SLVanilla' 'SLLatentRobust' 'SLAdvImg' 'SLError')
-  python -u main_train.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
+  python -u main_train.py   --config-file $configpath --method "${methods[$SLURM_ARRAY_TASK_ID]}"
   
   # python -u main_train.py --method 'SLVanilla'  --config-file $configpath
 
