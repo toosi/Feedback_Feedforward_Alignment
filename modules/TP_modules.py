@@ -60,7 +60,7 @@ class LinearFunction(autograd.Function):
 
     @staticmethod
     # same as reference linear function, but with additional fa tensor for backward
-    def forward(context, input, weight, weight_feedback, bias=None, algorithm):
+    def forward(context, input, weight, weight_feedback, bias=None, algorithm='BP'):
         context.algorithm = algorithm
         context.save_for_backward(input, weight, weight_feedback, bias)
         output = input.mm(weight.t())
@@ -95,7 +95,7 @@ class LinearFunction(autograd.Function):
             grad_bias = grad_output.sum(0).squeeze(0)
         
         
-        return grad_input, grad_weight, grad_weight_feedback, grad_bias
+        return grad_input, grad_weight, grad_weight_feedback, grad_bias, None
 
 class Linear(nn.Module):
 
@@ -107,14 +107,13 @@ class Linear(nn.Module):
 
     def __init__(self, input_features, output_features, bias, algorithm ):     # we ignore bias for now
         
-        implemented_algorithms = ['BP', 'FA', 'YY']
+        implemented_algorithms = ['BP', 'FA', 'YY', 'TP']
         assert algorithm in implemented_algorithms, 'feedback algorithm %s is not implemented'
 
         super(Linear, self).__init__()
         # self.input_features = input_features
         # self.output_features = output_features
         self.algorithm = algorithm
-        self.algorithm_id = nn.Parameter(torch.tensor(implemented_algorithms.index(algorithm)), requires_grad=False)
         # weight and bias for forward pass
         # weight has transposed form for efficiency (?) (transposed at forward pass)
 
@@ -158,7 +157,7 @@ class Linear(nn.Module):
             self.weight_feedback.data = copy.deepcopy(self.weight.detach())
 
 
-        return LinearFunction.apply(input, self.weight, self.weight_feedback, self.bias, self.algorithm_id)
+        return LinearFunction.apply(input, self.weight, self.weight_feedback, self.bias, self.algorithm)
         
 
 # ------ Convolution
