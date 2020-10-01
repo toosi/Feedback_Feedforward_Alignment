@@ -266,7 +266,7 @@ else:
     image_channels = 3
 
 if 'FullyConnected' in args.arche:
-    kwargs_asym = {'algorithm':'FA', 'hidden_layers':[784, 256, 256,10], 'nonlinearfunc':'relu', 'input_length':1024}
+    kwargs_asym = {'algorithm':'FA', 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
 else:
     kwargs_asym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
 
@@ -274,7 +274,7 @@ else:
 modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_asym)).cuda() #Forward().cuda() # main model
 modelB = nn.parallel.DataParallel(getattr(custom_models, args.archd)(**kwargs_asym)).cuda() # backward network to compute gradients for modelF
 if 'FullyConnected' in args.arche:
-    kwargs_sym = {'algorithm':'BP', 'hidden_layers':[784, 256, 256,10], 'nonlinearfunc':'relu', 'input_length':1024}
+    kwargs_sym = {'algorithm':'BP', 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
 else:
     kwargs_sym = {'algorithm':'BP', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
 

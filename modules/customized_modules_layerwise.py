@@ -740,4 +740,4 @@ class ReLUBFunc(torch.autograd.Function):
         grad_input[criteria < 0] = 0
         return grad_input, None
 
-ReLUB = ReLUBFunct.apply
+ReLUB = ReLUBFunc.apply

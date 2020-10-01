@@ -5,6 +5,7 @@ import random
 import shutil
 import time
 import warnings
+import pandas as pd
 
 import torch
 import torch.nn as nn
@@ -274,11 +275,11 @@ def main_worker(gpu, ngpus_per_node, args):
         args.algorithm = args.method
         modelidentifier = 'F'
     if 'FullyConnected' in args.arche:
-        kwargs_asym = {'algorithm':'FA', 'hidden_layers':[784, 256, 256,10], 'nonlinearfunc':'relu', 'input_length':1024}
+        kwargs_asym = {'algorithm':'FA', 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
     else:
         kwargs_asym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
 
-
+    print(kwargs_asym)
     modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_asym)).cuda() #Forward().cuda() # main model
     modelB = nn.parallel.DataParallel(getattr(custom_models, args.archd)(**kwargs_asym)).cuda() # backward network to compute gradients for modelF
 
@@ -572,6 +573,7 @@ def main_worker(gpu, ngpus_per_node, args):
     Alignments_ratios_first_layer_list =  []
     Alignments_ratios_last_layer_list =  []
 
+    results = {'train_acc': [],  'test_acc': [], 'train_lossd': [],  'test_lossd': [], 'train_corrd': [],  'test_corrd': []}
     for epoch in range(args.start_epoch, args.epochs):
 
         if args.distributed:
@@ -590,6 +592,11 @@ def main_worker(gpu, ngpus_per_node, args):
         Train_corrd_list.extend([round(train_results[1],3)])
         Train_lossd_list.extend([train_results[2]])
         Train_lossl_list.extend([train_results[3]])
+
+        results['train_acc'].append(round(train_results[0],3))
+        results['train_corrd'].append(train_results[1])
+        results['train_lossd'].append(train_results[2])
+
         run_json_dict.update({'Train_acce':Train_acce_list})
         run_json_dict.update({'Train_corrd':Train_corrd_list})
         run_json_dict.update({'Train_lossd':Train_lossd_list})
@@ -598,6 +605,10 @@ def main_worker(gpu, ngpus_per_node, args):
         # evaluate on validation set
         _, _, test_results = validate(val_loader, modelF,modelB, criterione, criteriond, args, epoch)
         
+        results['test_acc'].append(round(test_results[0],3))
+        results['test_lossd'].append(test_results[2])
+        results['test_corrd'].append(test_results[1])
+
         acce = test_results[0]
         corrd = test_results[1]
         Test_acce_list.extend( [round(test_results[0],3)])
@@ -609,6 +620,10 @@ def main_worker(gpu, ngpus_per_node, args):
         run_json_dict.update({'Test_corrd':Test_corrd_list})
         run_json_dict.update({'Test_lossd':Test_lossd_list})
         run_json_dict.update({'Test_lossl':Test_lossl_list})
+
+        # save statistics
+        data_frame = pd.DataFrame(data=results)
+        data_frame.to_csv(args.resultsdir + 'training_results_%s.csv'%args.algorithm)
 
         # evaluate alignments
         list_WF = [k for k in modelF.state_dict().keys() if 'feedback' in k]
