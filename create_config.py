@@ -211,13 +211,22 @@ elif 'MNIST' in args.dataset:
 if args.hash is None:
     hash = random.getrandbits(10)
 else:
-    hash = args.hash
+    hash = args.hash+'_'+str(random.getrandbits(10))
 
 project = 'Symbio' #'SYY_MINST'
 arch = 'E%sD%s'%(args.arche, args.archd)
 
 args.imagesetdir = path_prefix+'/Data/'
 args.runname = rundatetime+'_%s_%s_'%(args.dataset,commit[0:min(len(commit), 10)])+str(hash)
+
+if args.hash is not None:
+    if not os.path.exists(path_prefix+'/Results/Symbio/runswithhash'):
+        os.makedirs(path_prefix+'/Results/Symbio/runswithhash')
+    with open(path_prefix+'/Results/Symbio/runswithhash/%s.txt'%args.hash, "a") as file:
+        file.write("\n")
+        file.write(args.runname)
+
+
 args.resultsdir = path_prefix+'/Results/Symbio/Symbio/%s/'%args.runname
 args.tensorboarddir = path_prefix + '/Results/Tensorboard_runs/runs'+'/%s/'%project +args.runname
 args.path_prefix = path_prefix
