@@ -2,7 +2,7 @@
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
 #SBATCH -c 20
-#SBATCH --gres=gpu:gtx2080:2
+#SBATCH --gres=gpu:2
 #SBATCH --mem=20gb
 #SBATCH --array=0-2
 #SBATCH --time=5-00:00:00
@@ -60,6 +60,8 @@ if [ $config == 0 ]
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/SGDRMSprop.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSprop.txt'
     filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTAsymResLNet10.txt'
+    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTFullyConn.txt'
+    
     n=1
     while read line; do
     # reading each line
@@ -72,7 +74,7 @@ if [ $config == 0 ]
     methods=('SLVanilla' 'BP' 'FA') # ('SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
 
     python -u main_train.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
-    
+    #python -u main_train.py --method SLVanilla  --config-file $configpath
     done < $filename
 
 
