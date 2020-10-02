@@ -274,6 +274,7 @@ if 'MNIST' in args.dataset:
 else:
     image_channels = 3
 
+
 if 'FullyConnected' in args.arche:
     kwargs_asym = {'algorithm':'FA', 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
 else:

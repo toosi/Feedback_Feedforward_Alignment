@@ -274,10 +274,11 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
         args.algorithm = args.method
         modelidentifier = 'F'
+
     if 'FullyConnected' in args.arche:
-        kwargs_asym = {'algorithm':'FA', 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
+        kwargs_asym = {'algorithm':args.algorithm, 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
     else:
-        kwargs_asym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
+        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
 
     print(kwargs_asym)
     modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_asym)).cuda() #Forward().cuda() # main model
@@ -699,7 +700,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 }, is_beste,  filename='checkpointd_%s.pth.tar'%args.method)
             
             
-            with open('%s/%s_%s.json'%(args.databasedir,args.runname, args.method), 'w') as fp:
+            with open('%s/run_json_dict_%s.json'%(args.resultsdir, args.method), 'w') as fp:
                 
                 json.dump(run_json_dict, fp, indent=4, sort_keys=True)        
                 fp.write("\n")
@@ -790,7 +791,7 @@ def main_worker(gpu, ngpus_per_node, args):
                     }, is_beste,  filename='checkpointd_%s.pth.tar'%args.method)
                 
                 
-                with open('%s/%s_%s.json'%(args.databasedir,args.runname, args.method), 'w') as fp:
+                with open('%s/%s/run_json_dict_%s.json'%(args.resultsdir,args.runname, args.method), 'w') as fp:
                     
                     json.dump(run_json_dict, fp, indent=4, sort_keys=True)        
                     fp.write("\n")
@@ -1305,7 +1306,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
     return modelF, modelB, [top1.avg, corr.avg, losses.avg, losslatent.avg]
 
 
-def save_checkpoint(state, is_best, filepath=args.path_save_model ,filename='checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, filepath=args.resultsdir ,filename='checkpoint.pth.tar'):
     torch.save(state, filepath+filename)
     if is_best:
         shutil.copyfile(filepath+filename, filepath+'best'+filename)
