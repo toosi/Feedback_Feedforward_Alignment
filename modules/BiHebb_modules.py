@@ -83,7 +83,7 @@ class LinearFunction(autograd.Function):
             grad_weight = grad_output.t().mm(input) # (sorta)Hebbian update for forward
         
         if context.needs_input_grad[2]:
-            # only YY needs gradients for backward weights
+            # only SL needs gradients for backward weights
 
             grad_weight_feedback = grad_output.t().mm(input)  # (sorta)Hebbian update for backward
             
@@ -104,14 +104,13 @@ class Linear(nn.Module):
 
     def __init__(self, input_features, output_features, bias, algorithm ):     # we ignore bias for now
         
-        implemented_algorithms = ['BP', 'FA', 'YY']
-        assert algorithm in implemented_algorithms, 'feedback algorithm %s is not implemented'
+        # implemented_algorithms = ['BP', 'FA', 'SL']
+        # assert algorithm in implemented_algorithms, 'feedback algorithm %s is not implemented'
 
         super(Linear, self).__init__()
         # self.input_features = input_features
         # self.output_features = output_features
         self.algorithm = algorithm
-        self.algorithm_id = nn.Parameter(torch.tensor(implemented_algorithms.index(algorithm)), requires_grad=False)
         # weight and bias for forward pass
         # weight has transposed form for efficiency (?) (transposed at forward pass)
 
@@ -123,7 +122,7 @@ class Linear(nn.Module):
             self.bias = nn.Parameter(torch.Tensor(output_features))
         else: 
             self.register_parameter('bias', None)
-        if self.algorithm == 'YY':
+        if self.algorithm == 'SL':
             back_requires_grad = True
         else:
             back_requires_grad = False
@@ -329,7 +328,7 @@ class Conv2dFunction(autograd.Function):
         
         if context.needs_input_grad[2]:
             # hebbian backward
-            # only YY needs gradients for backward weights
+            # only SL needs gradients for backward weights
 
             weight_feedback_size = weight.shape
             grad_weight_feedback = conv2d_weight(input, weight_feedback_size, grad_output, stride , 
@@ -371,7 +370,7 @@ class Conv2d(nn.Module):
             raise ValueError('out_channels must be divisible by groups')
             
         self.algorithm = algorithm
-        # implemented_algorithms = ['BP', 'FA', 'YY']
+        # implemented_algorithms = ['BP', 'FA', 'SL']
         # self.algorithm_id = nn.Parameter(torch.tensor(implemented_algorithms.index(algorithm)), requires_grad=False)
 
         self.in_channels = in_channels
@@ -386,7 +385,7 @@ class Conv2d(nn.Module):
         self.groups = groups
         self.padding_mode = padding_mode
         
-        if self.algorithm == 'YY':
+        if self.algorithm == 'SL':
             back_requires_grad = True
         else:
             back_requires_grad = False
@@ -645,7 +644,7 @@ class _NormBase(nn.Module):
         self.track_running_stats = track_running_stats
 
         self.algorithm = algorithm
-        if self.algorithm == 'YY':
+        if self.algorithm == 'SL':
             back_requires_grad = True
         else:
             back_requires_grad = False
@@ -767,10 +766,10 @@ class SyncBatchNorm(_BatchNorm):
 
 
         self.algorithm = algorithm
-        implemented_algorithms = ['BP', 'FA', 'YY']
+        implemented_algorithms = ['BP', 'FA', 'SL']
         self.algorithm_id = nn.Parameter(torch.tensor(implemented_algorithms.index(algorithm)), requires_grad=False)
         
-        if self.algorithm == 'YY':
+        if self.algorithm == 'SL':
             back_requires_grad = True
         else:
             back_requires_grad = False
