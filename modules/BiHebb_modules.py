@@ -60,8 +60,9 @@ class LinearFunction(autograd.Function):
 
     @staticmethod
     # same as reference linear function, but with additional fa tensor for backward
-    def forward(context, input, weight, weight_feedback, bias=None, algorithm_id=0):
-        context.save_for_backward(input, weight, weight_feedback, bias, algorithm_id)
+    def forward(context, input, weight, weight_feedback, bias=None, algorithm='BP'):
+        context.save_for_backward(input, weight, weight_feedback, bias)
+        context.algorithm = algorithm
         output = input.mm(weight.t())
 
         if bias is not None:
@@ -70,7 +71,7 @@ class LinearFunction(autograd.Function):
 
     @staticmethod
     def backward(context, grad_output):
-        input, weight, weight_feedback, bias, algorithm_id = context.saved_tensors
+        input, weight, weight_feedback, bias = context.saved_tensors
         grad_input = grad_weight = grad_weight_feedback = grad_bias = None
 
         if context.needs_input_grad[0]:
@@ -104,14 +105,14 @@ class Linear(nn.Module):
 
     def __init__(self, input_features, output_features, bias, algorithm ):     # we ignore bias for now
         
-        implemented_algorithms = ['BP', 'FA', 'YY']
-        assert algorithm in implemented_algorithms, 'feedback algorithm %s is not implemented'
+        # implemented_algorithms = ['BP', 'FA', 'YY']
+        # assert algorithm in implemented_algorithms, 'feedback algorithm %s is not implemented'
 
         super(Linear, self).__init__()
         # self.input_features = input_features
         # self.output_features = output_features
         self.algorithm = algorithm
-        self.algorithm_id = nn.Parameter(torch.tensor(implemented_algorithms.index(algorithm)), requires_grad=False)
+        # self.algorithm_id = nn.Parameter(torch.tensor(implemented_algorithms.index(algorithm)), requires_grad=False)
         # weight and bias for forward pass
         # weight has transposed form for efficiency (?) (transposed at forward pass)
 
@@ -155,7 +156,7 @@ class Linear(nn.Module):
             self.weight_feedback.data = copy.deepcopy(self.weight.detach())
 
 
-        return LinearFunction.apply(input, self.weight, self.weight_feedback, self.bias, self.algorithm_id)
+        return LinearFunction.apply(input, self.weight, self.weight_feedback, self.bias, self.algorithm)
         
 
 # ------ Convolution
@@ -767,8 +768,8 @@ class SyncBatchNorm(_BatchNorm):
 
 
         self.algorithm = algorithm
-        implemented_algorithms = ['BP', 'FA', 'YY']
-        self.algorithm_id = nn.Parameter(torch.tensor(implemented_algorithms.index(algorithm)), requires_grad=False)
+        # implemented_algorithms = ['BP', 'FA', 'YY']
+        # self.algorithm_id = nn.Parameter(torch.tensor(implemented_algorithms.index(algorithm)), requires_grad=False)
         
         if self.algorithm == 'YY':
             back_requires_grad = True
