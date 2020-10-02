@@ -90,7 +90,8 @@ class LinearFunction(autograd.Function):
         if bias is not None and context.needs_input_grad[3]:
             grad_bias = grad_output.sum(0).squeeze(0)
         
-        
+        grad_weight_feedback = None
+
         return grad_input, grad_weight, grad_weight_feedback, grad_bias, None
 
 class Linear(nn.Module):
@@ -336,8 +337,8 @@ class Conv2dFunction(autograd.Function):
             
         if bias is not None and context.needs_input_grad[3]:
             grad_bias = grad_output.sum(0).squeeze(0)
-        
-        
+
+        grad_weight_feedback = None
         return grad_input, grad_weight, grad_weight_feedback, grad_bias, None, None, None, None
 
 
