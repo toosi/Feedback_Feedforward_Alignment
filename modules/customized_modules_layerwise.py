@@ -105,7 +105,7 @@ class LinearModule(nn.Module):
         
         if self.algorithm == 'BP':
             self.weight_feedback.data = copy.deepcopy(self.weight.data)
-        
+            
         if self.bottomup:
                 
             if self.algorithm == 'BP':
