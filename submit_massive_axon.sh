@@ -4,7 +4,7 @@
 #SBATCH -c 20
 #SBATCH --gres=gpu:2
 #SBATCH --mem=20gb
-#SBATCH --array=0-2
+#SBATCH --array=0-19
 #SBATCH --time=5-00:00:00
 #SBATCH -A issa
 
@@ -56,27 +56,29 @@ config=0
 
 if [ $config == 0 ]
     then
-    # filename='/home/tt2684/Research/Results/Symbio/hypersearch/runnames.txt'
-    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/SGDRMSprop.txt'
-    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSprop.txt'
     filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTAsymResLNet10.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTFullyConn.txt'
+    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTFullyConnE150.txt'
     
     n=1
+    runnames=()
     while read line; do
     # reading each line
     echo "Line No. $n : $line"
     n=$((n+1))
     
     runname=$line #Sep30-14-41_MNIST_4c4b77d125_237 # Sep30-11-43_MNIST_4c4b77d125_516   #May25-09-00_CIFAR10_b784081472_181
+    runnames+=( $runname )
     # configpath="/home/tahereh/Documents/Research/Results/Symbio/Symbio/$runname/configs.yml"
-    configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
+    # configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
     methods=('SLVanilla' 'BP' 'FA') # ('SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
 
-    python -u main_train.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
-    #python -u main_train.py --method SLVanilla  --config-file $configpath
+    # python -u main_train.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
     done < $filename
 
+    configpath="/home/tt2684/Research/Results/Symbio/Symbio/${runnames[$SLURM_ARRAY_TASK_ID]}/configs.yml"
+    printf " Here $configpath \n"
+    python -u main_train.py --method BP  --config-file $configpath
 
     fi
 

@@ -103,8 +103,8 @@ class LinearModule(nn.Module):
 
     def forward(self, inputs):
         
-        # if self.algorithm == 'BP':
-        #     self.weight_feedback = copy.deepcopy(self.weight).contiguous()
+        if self.algorithm == 'BP':
+            self.weight_feedback.data = copy.deepcopy(self.weight.data)
             
         if self.bottomup:
                 
@@ -561,6 +561,7 @@ class AsymmetricFeedbackConv2d(_ConvNdFA):
         else:
             
             if self.algorithm == 'BP':
+                self.weight_feedback.data = copy.deepcopy(self.weight.data)
                 return F.conv2d(input, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
             else:
                 return ConvAsymFunc.apply(input, self.weight, self.weight_feedback ,self.bias, self.stride,\
