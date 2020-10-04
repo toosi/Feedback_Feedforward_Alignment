@@ -587,14 +587,26 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # evaluate alignments
         list_WF = [k for k in modelF.state_dict().keys() if 'feedback' in k]
+        list_WB = [k for k in modelB.state_dict().keys() if 'feedback' in k]
+
         first_layer_key = list_WF[0]
         last_layer_key = list_WF[-1]
+
+        if 'FullyConn' in args.arche:
+            # TODO in the naive implementation of fully connected, fc-0 in modelB corresponds to fc-2 in modelF, fixed it
+            first_layer_keyB = list_WB[-1]
+            last_layer_keyB = list_WB[0]
+        else:
+            first_layer_keyB = first_layer_key
+            last_layer_keyB = copy.deepcopy(last_layer_key)
+
+        print(first_layer_key, last_layer_key)
         if 'downsample' in last_layer_key:
-            last_layer_keyB = last_layer_key.replace('down', 'up').strip('_feedback')
+            last_layer_keyB = last_layer_keyB.replace('down', 'up').strip('_feedback')
 
         # here for autoencoders I replaced modelF with modelB because we don't toggle weights here
-        corrs_first_layer = correlation(modelF.state_dict()[first_layer_key.strip('_feedback')], modelB.state_dict()[first_layer_key.strip('_feedback')])
-        ratios_first_layer = torch.norm(modelF.state_dict()[first_layer_key.strip('_feedback')]).item()/torch.norm(modelB.state_dict()[first_layer_key.strip('_feedback')]).item() 
+        corrs_first_layer = correlation(modelF.state_dict()[first_layer_key.strip('_feedback')], modelB.state_dict()[first_layer_keyB])
+        ratios_first_layer = torch.norm(modelF.state_dict()[first_layer_key.strip('_feedback')]).item()/torch.norm(modelB.state_dict()[first_layer_keyB]).item() 
 
         corrs_last_layer = correlation(modelF.state_dict()[last_layer_key.strip('_feedback')], modelB.state_dict()[last_layer_keyB])
         ratios_last_layer = torch.norm(modelF.state_dict()[last_layer_key.strip('_feedback')]).item()/torch.norm(modelB.state_dict()[last_layer_keyB]).item() 
@@ -602,7 +614,7 @@ def main_worker(gpu, ngpus_per_node, args):
         norm_first_layer = torch.norm(modelB.state_dict()[first_layer_key.strip('_feedback')]).item()
         norm_last_layer = torch.norm(modelB.state_dict()[last_layer_keyB]).item()
 
-        norm_first_layer_back = torch.norm(modelB.state_dict()[first_layer_key.strip('_feedback')]).item()
+        norm_first_layer_back = torch.norm(modelB.state_dict()[first_layer_keyB]).item()
         norm_last_layer_back = torch.norm(modelB.state_dict()[last_layer_keyB]).item()
 
 
