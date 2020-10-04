@@ -32,6 +32,9 @@ printf "********************************************************** \n"
 ####Command to execute Python program
 config=0
 # init='May25-14-32_CIFAR10_9fb773a12e_987' # use: -loadinitialization $init
+
+
+
 #Fully Connected
 # python -u create_config.py  --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
 # python -u create_config.py  --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-3 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
@@ -78,8 +81,8 @@ if [ $config == 0 ]
 
     configpath="/home/tt2684/Research/Results/Symbio/Symbio/${runnames[$SLURM_ARRAY_TASK_ID]}/configs.yml"
     printf " Here $configpath \n"
-    python -u main_train.py --method BP  --config-file $configpath
-
+    # python -u main_train.py --method BP  --config-file $configpath
+    python -u main_train_autoencoders.py --method FA  --config-file $configpath
     fi
 
 
