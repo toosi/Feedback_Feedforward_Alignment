@@ -1,6 +1,5 @@
 
 
-
 class VanillaBackprop():
     """
         Produces gradients generated with vanilla back propagation from the image
@@ -88,16 +87,23 @@ def generate_sample_images(images, target, title, param_dict, args):
             implot = (implot - np.min(implot))/np.ptp(implot)                
         else:
             implot = implot.squeeze()
-        axes[im].imshow(implot)
+        if args.dataset == 'MNIST':
+            axes[im].imshow(implot, cmap='gray')
+        else:
+            axes[im].imshow(implot)
         axes[im].axis('off')
         if args.dataset == 'CIFAR10':
             axes[im].set_title('C=%s'%classes[target[im].item()])
         else: 
             axes[im].set_title('C=%s'%target[im].item())
+    
     fig.suptitle(args.runname + ', %s: %s'%(title, param_dict), fontsize=8)
-    fig.savefig(args.resultsdir+'%s_samples_eval%s_%s_%s.png'%(title, args.eval_time, args.method, param_dict), dpi=200)
-    fig.savefig(args.resultsdir+'%s_samples_eval%s_%s_%s.pdf'%(title, args.eval_time, args.method, param_dict), dpi=200)
-    print('%s_samples_eval%s_%s_%s.png saved at %s'%(title, args.eval_time, args.method, param_dict, args.resultsdir))
+    if not os.path.exists(args.resultsdir+'evaluate'):
+        os.makedirs(args.resultsdir+'evaluate')
+    
+    fig.savefig(args.resultsdir+'evaluate/%s_samples_eval%s_%s_%s.png'%(title, args.eval_time, args.method, param_dict), dpi=200)
+    fig.savefig(args.resultsdir+'evaluate/%s_samples_eval%s_%s_%s.pdf'%(title, args.eval_time, args.method, param_dict), dpi=200)
+    print('%s_samples_eval%s_%s_%s.png saved at %sevaluate/'%(title, args.eval_time, args.method, param_dict, args.resultsdir))
     plt.clf()
 
 
@@ -160,10 +166,13 @@ def plot_RDMs(tensor, n_samples, title, args):
         
     fig.colorbar(im, cax=cbar_ax)
     # axes.set_title('C=%s'%target[im].item())
+    if not os.path.exists(args.resultsdir+'evaluate'):
+        os.makedirs(args.resultsdir+'evaluate')
+        
     fig.suptitle(args.runname + ' method=%s, %s'%(args.method, title), fontsize=title_font)
-    fig.savefig(args.resultsdir+'RDMs%s_eval%s_%s.png'%(title, args.eval_time, args.method), dpi=200)
-    fig.savefig(args.resultsdir+'RDMs%s_eval%s_%s.pdf'%(title, args.eval_time, args.method), dpi=200)
-    print('RDM %s_eval%s_%s.png saved at %s'%(title, args.eval_time, args.method, args.resultsdir))
+    fig.savefig(args.resultsdir+'evaluate/RDMs%s_eval%s_%s.png'%(title, args.eval_time, args.method), dpi=200)
+    fig.savefig(args.resultsdir+'evaluate/RDMs%s_eval%s_%s.pdf'%(title, args.eval_time, args.method), dpi=200)
+    print('RDM %s_eval%s_%s.png saved at %sevaluate/'%(title, args.eval_time, args.method, args.resultsdir))
     plt.clf()
 
     return implot

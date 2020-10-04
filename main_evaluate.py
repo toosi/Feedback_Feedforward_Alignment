@@ -111,7 +111,7 @@ if args.config_file:
         setattr(args, key, value)
 
 
-# ------- to cope with older configurations -------------------
+# ------- to comply with older configurations -------------------
 if 'ConvMNIST_playground' in args.resultsdir:
     arch = 'E%sD%s'%(args.arche, args.archd)
     args.resultsdir = args.resultsdir.replace('ConvMNIST_playground', 'SYY2020')
@@ -295,7 +295,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 {'params': parameters_scale, 'lr': args.lrF/10.}, 
                 {'params': parameters_others}], 
                 lr=args.lrF, 
-                momentum=args.momentum, 
+                momentum=args.momentumF, 
                 weight_decay=args.wdF)
                                     
 
@@ -313,23 +313,23 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
 
         optimizerF = getattr(torch.optim,args.optimizerF)(list(modelF.parameters()), args.lrF,
-                                momentum=args.momentum,
+                                momentum=args.momentumF,
                                 weight_decay=args.wdF)
                                 
 
         optimizerB = getattr(torch.optim,args.optimizerB)(modelB.parameters(), args.lrB,
-                                    momentum=args.momentum,
+                                    momentum=args.momentumB,
                                     weight_decay=args.wdB) 
         
     schedulerF = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerF, 'max', patience=args.patiencee, factor=args.factore)
     schedulerB = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerB, 'max', patience=args.patienced, factor=args.factord)
 
     # ------load Trained models ---------
-    modelF_trained = torch.load(args.path_save_model+'checkpointe_%s.pth.tar'%args.method)['state_dict']
+    modelF_trained = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['state_dict']
     if args.method.startswith('SL') or args.method == 'BSL':
-        modelB_trained = torch.load(args.path_save_model+'checkpointd_%s.pth.tar'%args.method)['state_dict']
+        modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
     else:
-        modelB_trained= toggle_state_dict_BPtoYY(modelF_trained, modelB.state_dict())
+        modelB_trained = toggle_state_dict_BPtoYY(modelF_trained, modelB.state_dict())
     
         
     modelF.load_state_dict(modelF_trained)
@@ -555,7 +555,9 @@ def main_worker(gpu, ngpus_per_node, args):
     
 
     if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
-        json_name =  '%s%s_%s_eval%s_maxitr%d_epsilon%0.1e_noisesigma2%s.json'%(args.databasedir,args.runname, args.method, args.eval_time, args.eval_maxitr, args.eval_epsilon, args.eval_sigma2)
+        if not os.path.exists(args.resultsdir+'evaluate'):
+            os.makedirs(args.resultsdir+'evaluate')
+        json_name =  '%sevaluate/%s_eval%s_maxitr%d_epsilon%0.1e_noisesigma2%s.json'%(args.resultsdir, args.method, args.eval_time, args.eval_maxitr, args.eval_epsilon, args.eval_sigma2)
         print('json saved at: ',json_name)
         with open(json_name, 'w') as fp:
             run_json_dict.update(arg_dict)
@@ -1177,7 +1179,9 @@ def generate_RDMs(val_loader, modelF, modelB, criterione, criteriond, args):
             print(args.method+': conv1',ss.pearsonr(RDM_conv1_FF.ravel(), RDM_conv1_FB.ravel()))
 
             # save RDMs so that we can compare different methods by generate_figures.py
-            hf = h5py.File(args.resultsdir+'RDMs_%s.h5'%args.method, 'w')
+            if not os.path.exists(args.resultsdir+'evaluate'):
+                os.makedirs(args.resultsdir+'evaluate')
+            hf = h5py.File(args.resultsdir+'evaluate/RDMs_%s.h5'%args.method, 'w')
             hf.create_dataset('RDM_upsample2', data=RDM_upsample2)
             hf.create_dataset('RDM_latents_FF', data=RDM_latents_FF)
             hf.create_dataset('RDM_conv1_FF', data=RDM_conv1_FF)
