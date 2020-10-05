@@ -4,7 +4,7 @@
 #SBATCH -c 20
 #SBATCH --gres=gpu:2
 #SBATCH --mem=20gb
-#SBATCH --array=0-19
+#SBATCH --array=0-23
 #SBATCH --time=5-00:00:00
 #SBATCH -A issa
 
@@ -59,9 +59,9 @@ config=0
 
 if [ $config == 0 ]
     then
-    filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTAsymResLNet10.txt'
+    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTAsymResLNet10.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTFullyConn.txt'
-    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTFullyConnE150.txt'
+    filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTFullyConnE150.txt'
     
     n=1
     runnames=()

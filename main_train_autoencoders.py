@@ -600,7 +600,6 @@ def main_worker(gpu, ngpus_per_node, args):
             first_layer_keyB = first_layer_key
             last_layer_keyB = copy.deepcopy(last_layer_key)
 
-        print(first_layer_key, last_layer_key)
         if 'downsample' in last_layer_key:
             last_layer_keyB = last_layer_keyB.replace('down', 'up').strip('_feedback')
 
