@@ -63,6 +63,8 @@ def toggle_state_dict(state_dict):
     return new_state_dict
 
 
+
+
 def toggle_state_dict_normalize(state_dict):
     # this code copies the forward parameters to the backward parameters and vice versa
     # additionally it normalizes both the forward and backward path 

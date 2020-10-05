@@ -565,7 +565,7 @@ def main_worker(gpu, ngpus_per_node, args):
         run_json_dict.update({'Train_lossd':Train_lossd_list})
 
         # evaluate on validation set
-        _, _, test_results = validate(val_loader, modelF,modelB, criterione, criteriond, args, epoch)
+        _, _, test_results = validate(val_loader,train_loader, modelF,modelB, criterione, criteriond, args, epoch)
         
         results['test_acc'].append(round(test_results[0],3))
         results['test_lossd'].append(test_results[2])
@@ -600,7 +600,6 @@ def main_worker(gpu, ngpus_per_node, args):
             first_layer_keyB = first_layer_key
             last_layer_keyB = copy.deepcopy(last_layer_key)
 
-        print(first_layer_key, last_layer_key)
         if 'downsample' in last_layer_key:
             last_layer_keyB = last_layer_keyB.replace('down', 'up').strip('_feedback')
 
@@ -742,14 +741,9 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, sch
 
         # optimizerFB_local.zero_grad()
         optimizerF.zero_grad()
-        latents, output = modelF(images)
+        latents, output_orig = modelF(images)
         _, recons = modelB(latents)
-        
-
-        # measure accuracy and record loss
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        top1.update(acc1[0].item(), images.size(0))
-
+         
         
         gener = recons
         reference = images
@@ -763,14 +757,49 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, sch
         losses.update(lossd.item(), images.size(0))
         corr.update(pcorr, images.size(0))
             
+    
+        if i % args.print_freq == 0:
+            # training a linear decoder
+            n_latents = latents.view(latents.shape[0], -1).shape[-1]
+            decoder = nn.Linear(n_latents, args.n_classes).cuda()
+            optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
+            criterionD = nn.CrossEntropyLoss()
+            for ep in range(5):
+                running_lossD = 0
+                for iD, (imagesD, targetD) in enumerate(train_loader):
+                
+                    imagesD = imagesD.cuda()
+                    targetD = targetD.cuda()   
 
+                
+                    if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
+                        imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
 
-        # measure elapsed time
+                    latentsD, output = modelF(imagesD)
+
+                    optimizerD.zero_grad()
+                    outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
+                    lossD = criterionD(outputsD, targetD)
+                    lossD.backward()
+                    optimizerD.step()
+
+                    running_lossD += lossD.item()
+
+            # print(running_lossD/(iD+1))
+            latents, _ = modelF(images)
+            output = decoder(latents.view(latents.shape[0], -1).detach())
+            # measure accuracy and record loss
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            top1.update(acc1[0].item(), images.size(0))
+            # measure elapsed time
+        
         batch_time.update(time.time() - end)
         end = time.time()
 
         if i % args.print_freq == 0:
             progress.display(i)
+
+        
 
     print(args.method + ': Autoencoder Train avg  * lossd {losses.avg:.3f}'
     .format(losses=losses), flush=True)
@@ -786,7 +815,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, sch
 
 
 
-def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
+def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, args, epoch):
 
     
     batch_time = AverageMeter('Time', ':6.3f')
@@ -812,65 +841,103 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
     modelF.eval()
     modelB.eval()
 
-    with torch.no_grad():
-        end = time.time()
-        for i, (images, target) in enumerate(val_loader):
+    
+    end = time.time()
+    for i, (images, target) in enumerate(val_loader):
 
-            
-            if args.gpu is not None:
-                images = images.cuda(args.gpu, non_blocking=True)
-                target = target.cuda(args.gpu, non_blocking=True)
-            else:
-                images = images.cuda()
-                target = target.cuda()
-            
-            onehot.zero_()
-            onehot.scatter_(1, target.view(target.shape[0], 1), 1)
-            
-            if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
-                images= images.expand(-1, 1, -1, -1) #images.expand(-1, 3, -1, -1)
-            
-            # ----- encoder ---------------------
-                       
-            # compute output
-            latents, output = modelF(images)
+        
+        if args.gpu is not None:
+            images = images.cuda(args.gpu, non_blocking=True)
+            target = target.cuda(args.gpu, non_blocking=True)
+        else:
+            images = images.cuda()
+            target = target.cuda()
+        
+        onehot.zero_()
+        onehot.scatter_(1, target.view(target.shape[0], 1), 1)
+        
+        if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
+            images= images.expand(-1, 1, -1, -1) #images.expand(-1, 3, -1, -1)
+        
+        # ----- encoder ---------------------
+                    
+        # compute output
+        latents, output_orig = modelF(images)
 
-            losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
+        losse = criterione(output_orig, target) #+ criteriond(modelB(latents.detach(), switches), images)
+
+        
+        # ----- decoder ------------------ 
+
+        _, recons = modelB(latents.detach())
+    
+        gener = recons
+        reference = images
+        reference = F.interpolate(reference, size=gener.shape[-1])
+
+        lossd = criteriond(gener, reference) #
+
+        # measure correlation and record loss
+        pcorr = correlation(gener, reference)
+        losses.update(lossd.item(), images.size(0))
+        corr.update(pcorr, images.size(0))
+        
+
+
+        if i % args.print_freq == 0:
+            # # training a linear decoder
+            
+            n_latents = latents.view(latents.shape[0], -1).shape[-1]
+            decoder = nn.Linear(n_latents, args.n_classes).cuda()
+            decoder.train()
+            optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
+            criterionD = nn.CrossEntropyLoss()
+            
+            for ep in range(5):
+                running_lossD = 0
+                for iD, (imagesD, targetD) in enumerate(train_loader):
+                
+                    imagesD = imagesD.cuda()
+                    targetD = targetD.cuda()   
+
+                
+                    if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
+                        imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
+
+                    latentsD, output = modelF(imagesD)
+
+                    optimizerD.zero_grad()
+                    outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
+                    lossD = criterionD(outputsD, targetD)
+                    lossD.backward()
+                    optimizerD.step()
+
+                    running_lossD += lossD.item()
+
+                # print(running_lossD/(iD+1))
+
+            latents, _ = modelF(images)
+            output = decoder(latents.view(latents.shape[0], -1).detach())
 
             # measure accuracy and record loss
             acc1, acc5 = accuracy(output, target, topk=(1, 5))
             top1.update(acc1[0].item(), images.size(0))
 
-            # ----- decoder ------------------ 
 
-            _, recons = modelB(latents.detach())
-        
-            gener = recons
-            reference = images
-            reference = F.interpolate(reference, size=gener.shape[-1])
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
 
-            lossd = criteriond(gener, reference) #
-
-            # measure correlation and record loss
-            pcorr = correlation(gener, reference)
-            losses.update(lossd.item(), images.size(0))
-            corr.update(pcorr, images.size(0))
-            
-
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
-
-            if i % args.print_freq == 0:
-                progress.display(i)
+        if i % args.print_freq == 0:
+            progress.display(i)
 
 
-        print('Test autoencoder avg {method} * lossd {losses.avg:.3f}'
-            .format(method=args.method,losses=losses), flush=True)
+    print('Test autoencoder avg {method} * lossd {losses.avg:.3f}'
+        .format(method=args.method,losses=losses), flush=True)
 
-        # TODO: this should also be done with the ProgressMeter
-        print('Test autoencoder avg  {method} * Acc@1 {top1.avg:.3f}'
-            .format(method=args.method, top1=top1), flush=True)
+    # TODO: this should also be done with the ProgressMeter
+    print('Test autoencoder avg  {method} * Acc@1 {top1.avg:.3f}'
+        .format(method=args.method, top1=top1), flush=True)
     
         
     writer.add_scalar('Test%s/acc1'%args.method, top1.avg , epoch)

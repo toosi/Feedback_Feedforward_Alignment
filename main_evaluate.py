@@ -51,11 +51,14 @@ import pytorch_ssim
 from utils import state_dict_utils
 from utils import helper_functions
 
-toggle_state_dict = state_dict_utils.toggle_state_dict
-# toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
-toggle_state_dict_YYtoBP = state_dict_utils.toggle_state_dict_YYtoBP
+# toggle_state_dict = state_dict_utils.toggle_state_dict
+# # toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
+# toggle_state_dict_YYtoBP = state_dict_utils.toggle_state_dict_YYtoBP
 toggle_state_dict_BPtoYY = state_dict_utils.toggle_state_dict_BPtoYY
-from models import custom_models_ResNetLraveled as custom_models
+# from models import custom_models_ResNetLraveled as custom_models
+
+
+
 
 # from models import custom_models as custom_models
 # from models import custom_models_Fixup as custom_models
@@ -72,6 +75,8 @@ elif socket.gethostname() == 'SYNPAI':
 elif socket.gethostname()[0:2] == 'ax':
     print('running on %s'%socket.gethostname())
     path_prefix = '/home/tt2684/Research'
+elif socket.gethostname() == 'turing':
+    path_prefix = '/home/tahereh/Documents/Research'
 
 parser = argparse.ArgumentParser(description='PyTorch Training')
 parser.add_argument(
@@ -110,6 +115,24 @@ if args.config_file:
     for key, value in data.items():
         setattr(args, key, value)
 
+if 'AsymResLNet' in args.arche:
+    toggle_state_dict = state_dict_utils.toggle_state_dict_normalize
+    from models import custom_models_ResNetLraveled as custom_models
+
+elif 'asymresnet' in args.arche:
+    toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
+    from models import custom_resnets as custom_models
+
+elif args.arche.startswith('resnet'):
+    from models import resnets as custom_models
+    #just for compatibality
+    toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
+elif  'FullyConnected' in args.arche:
+    toggle_state_dict = state_dict_utils.toggle_state_dict
+
+    from models import custom_models
+
+toggle_state_dict_YYtoBP = state_dict_utils.toggle_state_dict_YYtoBP
 
 # ------- to comply with older configurations -------------------
 if 'ConvMNIST_playground' in args.resultsdir:
@@ -126,6 +149,13 @@ if not hasattr(args,'tensorboarddir'):
     args.databasedir = path_prefix+'/Results/database/%s/%s/%s/'%(project,arch,args.dataset)
     args.arche = args.arche.replace('NoMaxP','')
     args.archd = args.archd.replace('NoMaxP','')
+
+if path_prefix not in args.resultsdir:
+    path_prefix_orig = args.resultsdir.split('/Results')[0]
+    args.resultsdir = args.resultsdir.replace(path_prefix_orig, path_prefix) 
+    args.imagesetdir = args.imagesetdir.replace(path_prefix_orig, path_prefix)
+    args.tensorboarddir = args.tensorboarddir.replace(path_prefix_orig, path_prefix)
+
 
 with open(args.resultsdir+'args.yml', 'w') as outfile:
     
@@ -275,8 +305,13 @@ def main_worker(gpu, ngpus_per_node, args):
         args.algorithm = 'FA'
         modelidentifier = 'F'
 
-    modelF = get_model(args.arche, args.gpu, {'algorithm': args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}) #, 'woFullyConnected':True
-    modelB = get_model(args.archd, args.gpu, {'algorithm': 'FA','base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes})
+    if 'FullyConnected' in args.arche:
+        kwargs_asym = {'algorithm':args.algorithm, 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
+    else:
+        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
+
+    modelF = get_model(args.arche, args.gpu, kwargs_asym) #, 'woFullyConnected':True
+    modelB = get_model(args.archd, args.gpu, kwargs_asym)
 
     
     # define loss function (criterion) and optimizer
@@ -326,11 +361,20 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # ------load Trained models ---------
     modelF_trained = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['state_dict']
-    if args.method.startswith('SL') or args.method == 'BSL':
-        modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
-    else:
-        modelB_trained = toggle_state_dict_BPtoYY(modelF_trained, modelB.state_dict())
+    # if args.method.startswith('SL') or args.method == 'BSL':
+    #     modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
+    # else:
+    #     modelB_trained = toggle_state_dict_BPtoYY(modelF_trained, modelB.state_dict())
     
+    if args.algorithm in ['BP','FA']:
+        
+        modelB_trained = toggle_state_dict(modelF_trained)
+        if args.arche.startswith('FullyConn'):
+            
+            modelB_trained = state_dict_utils.toggle_weights(modelB.state_dict(), modelF_trained)
+        
+    else:
+        modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
         
     modelF.load_state_dict(modelF_trained)
     modelB.load_state_dict(modelB_trained)
@@ -612,7 +656,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
             onehot.scatter_(1, target.view(target.shape[0], 1), 1)
 
             if 'MNIST' in args.dataset  and args.arche[0:2]!='FC':
-                images= images.expand(-1, 1, -1, -1) #images.expand(-1, 3, -1, -1)
+                images= images.expand(-1, 1, -1, -1) # images.expand(-1, 3, -1, -1)
             
             # ----- encoder ---------------------
             images_noisy = images + torch.empty_like(images).normal_(mean=0, std=np.sqrt(sigma2)).cuda()

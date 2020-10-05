@@ -1,4 +1,5 @@
 {
     "workbench.preferredDarkColorTheme": "Default Light+",
-    "workbench.colorTheme": "Tomorrow Night Blue"
+    "workbench.colorTheme": "Tomorrow Night Blue",
+    "python.dataScience.jupyterServerURI": "local"
 }
