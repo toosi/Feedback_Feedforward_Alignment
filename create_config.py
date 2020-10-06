@@ -278,7 +278,7 @@ else:
 if 'FullyConnected' in args.arche:
     kwargs_asym = {'algorithm':'FA', 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
 else:
-    kwargs_asym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
+    kwargs_asym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': True}
 
 
 modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_asym)).cuda() #Forward().cuda() # main model
@@ -286,7 +286,7 @@ modelB = nn.parallel.DataParallel(getattr(custom_models, args.archd)(**kwargs_as
 if 'FullyConnected' in args.arche:
     kwargs_sym = {'algorithm':'BP', 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
 else:
-    kwargs_sym = {'algorithm':'BP', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
+    kwargs_sym = {'algorithm':'BP', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': True}
 
 modelC = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_sym)).cuda() # Forward Control model to compare to BP
 

@@ -278,7 +278,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if 'FullyConnected' in args.arche:
         kwargs_asym = {'algorithm':args.algorithm, 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
     else:
-        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
+        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': True}
 
     print(kwargs_asym)
     modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_asym)).cuda() #Forward().cuda() # main model
@@ -860,12 +860,12 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         losse.backward()
         optimizerF.step()
 
-        optimizerFB_local.zero_grad()
+        # optimizerFB_local.zero_grad()
         optimizerF.zero_grad()
         latents, output = modelF(images)
         losse = criterione(output, target)
         losse.backward()
-        optimizerFB_local.step()
+        # optimizerFB_local.step()
         optimizerF.step()
 
 
