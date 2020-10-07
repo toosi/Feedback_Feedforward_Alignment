@@ -4,7 +4,7 @@
 #SBATCH -c 20
 #SBATCH --gres=gpu:2
 #SBATCH --mem=20gb
-#SBATCH --array=0-23
+#SBATCH --array=0-19
 #SBATCH --time=5-00:00:00
 #SBATCH -A issa
 
@@ -61,8 +61,10 @@ if [ $config == 0 ]
     then
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTAsymResLNet10.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTFullyConn.txt'
-    filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTFullyConnE150.txt'
-    
+    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTFullyConnE150.txt'
+    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpRMSpMNISTAsymResLNet10BNaffine.txt'
+    filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpRMSpMNISTAsymResLNet10BNaffine2.txt'
+
     n=1
     runnames=()
     while read line; do
@@ -74,15 +76,47 @@ if [ $config == 0 ]
     runnames+=( $runname )
     # configpath="/home/tahereh/Documents/Research/Results/Symbio/Symbio/$runname/configs.yml"
     # configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
-    methods=('SLVanilla' 'BP' 'FA') # ('SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
+    # methods=('SLVanilla' 'BP' 'FA') # ('SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
 
     # python -u main_train.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
     done < $filename
 
+
+    method=SLVanilla
+
     configpath="/home/tt2684/Research/Results/Symbio/Symbio/${runnames[$SLURM_ARRAY_TASK_ID]}/configs.yml"
     printf " Here $configpath \n"
-    # python -u main_train.py --method BP  --config-file $configpath
-    python -u main_train_autoencoders.py --method FA  --config-file $configpath
+    python -u main_train.py --method $method  --config-file $configpath
+    python -u main_train_autoencoders.py --method $method  --config-file $configpath
+
+
+
+    
+
+    # robustness to noise evaluation
+    for eval_sigma2 in `seq 1e-3 0.1 1.0`
+    do
+    eval_epsilon=0.0
+    python -u main_evaluate.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time $now
+    done
+
+    
+    # robustness to adversarial attacks evaluation
+    for eval_epsilon in `seq 0.0 0.2 1.0`
+    do 
+    # for eval_sigma2 in `seq 0.0 0.0 0.0`
+    # do
+    eval_sigma2=1e-10
+    echo $method
+    echo $eval_sigma2
+    echo $eval_epsilon
+    python -u main_evaluate.py  --eval_save_sample_images False --method "${methods[$SLURM_ARRAY_TASK_ID]}" --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now 
+    done
+    
+    
+
+    python -u generate_figures.py --eval_swept_var sigma2 --eval_time now --config-file $configpath
+  
     fi
 
 

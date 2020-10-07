@@ -308,7 +308,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if 'FullyConnected' in args.arche:
         kwargs_asym = {'algorithm':args.algorithm, 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
     else:
-        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
+        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': True}
 
     modelF = get_model(args.arche, args.gpu, kwargs_asym) #, 'woFullyConnected':True
     modelB = get_model(args.archd, args.gpu, kwargs_asym)
@@ -519,7 +519,7 @@ def main_worker(gpu, ngpus_per_node, args):
     Test_corrd_list = []
     Test_lossd_list = []
     
-    assert (args.eval_sigma2==0) or (args.eval_epsilon == 0) or args.eval_generate_RDMs, 'Gaussian noise OR adversarial attack, choose one'
+    assert (args.eval_sigma2<1e-5) or (args.eval_epsilon == 0) or args.eval_generate_RDMs, 'Gaussian noise OR adversarial attack, choose one'
 
     if args.eval_alignments:
 
@@ -663,8 +663,8 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
             
             if (args.eval_save_sample_images) and not_saved:
                 not_saved = False
-                helper_functions.generate_sample_images(images, target, title='original', param_dict={}, args=args)
-                helper_functions.generate_sample_images(images_noisy, target, title='noisy inputs', param_dict={'sigma2':sigma2}, args=args)
+                # helper_functions.generate_sample_images(images, target, title='original', param_dict={}, args=args)
+                # helper_functions.generate_sample_images(images_noisy, target, title='noisy inputs', param_dict={'sigma2':sigma2}, args=args)
 
             # compute output
             latents, output = modelF(images_noisy)
@@ -787,7 +787,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
             
             if (args.eval_save_sample_images) and not_saved_itr:
                 not_saved_itr = False
-                helper_functions.generate_sample_images(gener, target, title='gener by '+args.method, param_dict={'sigma2':sigma2, 'itr':itr}, args=args)
+                # helper_functions.generate_sample_images(gener, target, title='gener by '+args.method, param_dict={'sigma2':sigma2, 'itr':itr}, args=args)
 
             
             # measure accuracy and record loss
@@ -952,8 +952,8 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
 
         if (args.eval_save_sample_images) and not_saved:
                 not_saved = False
-                helper_functions.generate_sample_images(images.detach(), target, title='original', param_dict={}, args=args)
-                helper_functions.generate_sample_images(perturbed_images.detach(), target, title='perturbed inputs by %s'%args.method, param_dict={'epsilon':args.eval_epsilon}, args=args)
+                # helper_functions.generate_sample_images(images.detach(), target, title='original', param_dict={}, args=args)
+                # helper_functions.generate_sample_images(perturbed_images.detach(), target, title='perturbed inputs by %s'%args.method, param_dict={'epsilon':args.eval_epsilon}, args=args)
 
         losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
 
@@ -1081,7 +1081,7 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
                     
         if (args.eval_save_sample_images) and not_saved_itr:
             not_saved_itr = False
-            helper_functions.generate_sample_images(gener.detach(), target, title='gener by '+args.method, param_dict={'epsilon':args.eval_epsilon, 'itr':itr}, args=args)
+            # helper_functions.generate_sample_images(gener.detach(), target, title='gener by '+args.method, param_dict={'epsilon':args.eval_epsilon, 'itr':itr}, args=args)
 
         
         # measure accuracy and record loss
@@ -1236,7 +1236,7 @@ def generate_RDMs(val_loader, modelF, modelB, criterione, criteriond, args):
 
             if (args.eval_save_sample_images) and not_saved_itr:
                 not_saved_itr = False
-                helper_functions.generate_sample_images(gener, target, title='gener by '+args.method, param_dict={'sigma2':sigma2, 'itr':itr}, args=args)
+                # helper_functions.generate_sample_images(gener, target, title='gener by '+args.method, param_dict={'sigma2':sigma2, 'itr':itr}, args=args)
 
             
             # measure accuracy and record loss
@@ -1347,7 +1347,7 @@ def feedback_stimulation(val_loader, modelF, modelB, criterione, criteriond, arg
                 print(onehot_stim[0,target[0]])
             if (args.eval_save_sample_images) and not_saved:
                 not_saved = False
-                helper_functions.generate_sample_images(recons.detach(), target, title='generated by %s'%args.method, param_dict={'stimulation':'latents'}, args=args)
+                # helper_functions.generate_sample_images(recons.detach(), target, title='generated by %s'%args.method, param_dict={'stimulation':'latents'}, args=args)
 
             
             
