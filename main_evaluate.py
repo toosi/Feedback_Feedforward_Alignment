@@ -308,7 +308,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if 'FullyConnected' in args.arche:
         kwargs_asym = {'algorithm':args.algorithm, 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
     else:
-        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
+        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': True}
 
     modelF = get_model(args.arche, args.gpu, kwargs_asym) #, 'woFullyConnected':True
     modelB = get_model(args.archd, args.gpu, kwargs_asym)
