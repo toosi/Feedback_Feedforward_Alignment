@@ -360,21 +360,23 @@ def main_worker(gpu, ngpus_per_node, args):
     schedulerB = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerB, 'max', patience=args.patienced, factor=args.factord)
 
     # ------load Trained models ---------
-    modelF_trained = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['state_dict']
+    modelF_trained = torch.load(args.resultsdir+'checkpointe_autoencoder_%s.pth.tar'%args.method)['state_dict']
+    modelB_trained = torch.load(args.resultsdir+'checkpointd_autoencoder_%s.pth.tar'%args.method)['state_dict']
+    
     # if args.method.startswith('SL') or args.method == 'BSL':
     #     modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
     # else:
     #     modelB_trained = toggle_state_dict_BPtoYY(modelF_trained, modelB.state_dict())
     
-    if args.algorithm in ['BP','FA']:
+    # if args.algorithm in ['BP','FA']:
         
-        modelB_trained = toggle_state_dict(modelF_trained)
-        if args.arche.startswith('FullyConn'):
+    #     modelB_trained = toggle_state_dict(modelF_trained)
+    #     if args.arche.startswith('FullyConn'):
             
-            modelB_trained = state_dict_utils.toggle_weights(modelB.state_dict(), modelF_trained)
+    #         modelB_trained = state_dict_utils.toggle_weights(modelB.state_dict(), modelF_trained)
         
-    else:
-        modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
+    # else:
+    #     modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
         
     modelF.load_state_dict(modelF_trained)
     modelB.load_state_dict(modelB_trained)
@@ -601,7 +603,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
         if not os.path.exists(args.resultsdir+'evaluate'):
             os.makedirs(args.resultsdir+'evaluate')
-        json_name =  '%sevaluate/%s_eval_maxitr%d_epsilon%0.1e_noisesigma2%s.json'%(args.resultsdir, args.method, args.eval_maxitr, args.eval_epsilon, args.eval_sigma2)
+        json_name =  '%sevaluate/%s_autoencoder_eval_maxitr%d_epsilon%0.1e_noisesigma2%s.json'%(args.resultsdir, args.method, args.eval_maxitr, args.eval_epsilon, args.eval_sigma2)
         print('json saved at: ',json_name)
         with open(json_name, 'w') as fp:
             run_json_dict.update(arg_dict)
