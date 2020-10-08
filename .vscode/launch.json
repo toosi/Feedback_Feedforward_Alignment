@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
-            "args": ["--method","BP", "--config-file", "/home/tahereh/Documents/Research/Results/Symbio/Symbio/Oct04-13-17_MNIST_b455c8455a_fullConn_517/configs.yml"]
+            "args": ["--method","BP", "--config-file", "/home/tahereh/Documents/Research/Results/Symbio/Symbio/Oct05-16-00_MNIST_3c45796306_RMSpropRMSpropMNISTAsymResLNet10_682/configs.yml"]
         }
     ]
 }
