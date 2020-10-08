@@ -97,7 +97,7 @@ if [ $config == 0 ]
     # for eval_sigma2 in `seq 1e-3 0.1 1.0`
     # do
     # eval_epsilon=0.0
-    # python -u main_evaluate.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time $now
+    # python -u main_evaluate.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
     # done
 
     
