@@ -411,11 +411,25 @@ def main_worker(gpu, ngpus_per_node, args):
         val_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, drop_last=True)
 
     elif 'MNIST' in args.dataset:
+
+        transform_train = transforms.Compose([
+        transforms.Resize(input_size),
+        transforms.ToTensor(),
+        ])
         
         transform_test = transforms.Compose([
             transforms.Resize(32),
             transforms.ToTensor(),
         ])
+
+        train_dataset = getattr(datasets, args.dataset)(root=args.imagesetdir, train=True, download=True, transform=transform_train)
+        if args.distributed:
+            train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        else:
+            train_sampler = None
+        
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,sampler=train_sampler, shuffle=(train_sampler is None), num_workers=args.workers, drop_last=True)
+
 
         test_dataset = getattr(datasets, args.dataset)(root=args.imagesetdir, train=False, download=True, transform=transform_test)
         
@@ -562,7 +576,7 @@ def main_worker(gpu, ngpus_per_node, args):
             # evaluate on validation set
             for itr in range(args.eval_maxitr):
 
-                _, _, test_results = validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, args.eval_sigma2)
+                _, _, test_results = validate(val_loader,train_loader, modelF, modelB, criterione, criteriond, args, itr, args.eval_sigma2)
                 
                 acce = test_results[0]
                 Test_acce_list.extend( [round(test_results[0],3)])
@@ -613,7 +627,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
 
-def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigma2):
+def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, args, itr, sigma2):
 
     
     batch_time = AverageMeter('Time', ':6.3f')
@@ -642,44 +656,141 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
     not_saved = True
     not_saved_itr = True
 
-    with torch.no_grad():
-        end = time.time()
-        for i, (images, target) in enumerate(val_loader):
+    
+    end = time.time()
+    for i, (images, target) in enumerate(val_loader):
 
-            
-            if args.gpu is not None:
-                images = images.cuda(args.gpu, non_blocking=True)
-                target = target.cuda(args.gpu, non_blocking=True)
-            else:
-                images = images.cuda()
-                target = target.cuda()
-            
-            onehot.zero_()
-            onehot.scatter_(1, target.view(target.shape[0], 1), 1)
+        
+        if args.gpu is not None:
+            images = images.cuda(args.gpu, non_blocking=True)
+            target = target.cuda(args.gpu, non_blocking=True)
+        else:
+            images = images.cuda()
+            target = target.cuda()
+        
+        onehot.zero_()
+        onehot.scatter_(1, target.view(target.shape[0], 1), 1)
 
-            if 'MNIST' in args.dataset  and args.arche[0:2]!='FC':
-                images= images.expand(-1, 1, -1, -1) # images.expand(-1, 3, -1, -1)
-            
-            # ----- encoder ---------------------
-            images_noisy = images + torch.empty_like(images).normal_(mean=0, std=np.sqrt(sigma2)).cuda()
-            
-            if (args.eval_save_sample_images) and not_saved:
-                not_saved = False
-                # helper_functions.generate_sample_images(images, target, title='original', param_dict={}, args=args)
-                # helper_functions.generate_sample_images(images_noisy, target, title='noisy inputs', param_dict={'sigma2':sigma2}, args=args)
+        if 'MNIST' in args.dataset  and args.arche[0:2]!='FC':
+            images= images.expand(-1, 1, -1, -1) # images.expand(-1, 3, -1, -1)
+        
+        # ----- encoder ---------------------
+        images_noisy = images + torch.empty_like(images).normal_(mean=0, std=np.sqrt(sigma2)).cuda()
+        
+        if (args.eval_save_sample_images) and not_saved:
+            not_saved = False
+            # helper_functions.generate_sample_images(images, target, title='original', param_dict={}, args=args)
+            # helper_functions.generate_sample_images(images_noisy, target, title='noisy inputs', param_dict={'sigma2':sigma2}, args=args)
 
+        # compute output
+        latents, _ = modelF(images_noisy)
+        # ----- decoder ------------------ 
+        _, recons_before_interpolation = modelB(latents.detach()) 
+        recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
+        
+        if args.method == 'SLTemplateGenerator':
+            repb = onehot.detach()#modelB(onehot.detach())
+            repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                    
+                    
+            _,targetproj = modelB(repb) #, switches
+
+            inputs_avgcat = torch.zeros_like(images)
+            for t in torch.unique(target):
+                inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
+        
+            gener = targetproj
+            reference = inputs_avgcat
+
+        
+        
+        elif args.method == 'SLError':
+            #TODO: check the norm of subtracts
+            prob = nn.Softmax(dim=1)(output.detach())
+            repb = onehot - prob
+            repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+            gener = modelB(repb.detach())
+            reference = images - F.interpolate(recons, size=images.shape[-1])
+
+        elif args.method == 'SLRobust':
+            
+            prob = nn.Softmax(dim=1)(output.detach())
+            repb = onehot - prob
+            repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+            _,gener = modelB(repb.detach())
+            reference = images 
+
+        elif args.method == 'SLErrorTemplateGenerator':
+            prob = nn.Softmax(dim=1)(output.detach())
+            repb = onehot - prob#modelB(onehot.detach())
+            
+            
+            repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+                    
+                    
+            _, targetproj = modelB(repb) #, switches
+
+            inputs_avgcat = torch.zeros_like(images)
+            for t in torch.unique(target):
+                inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
+        
+            gener = targetproj
+            reference = inputs_avgcat
+
+        else:# args.method in ['SLVanilla','BP','FA']:
+            gener = recons
+            reference = images
+
+        if (i % args.print_freq == 0) or (i == len(val_loader)):
+            # # training a linear decoder
+        
+            n_latents = latents.view(latents.shape[0], -1).shape[-1]
+            decoder = nn.Linear(n_latents, args.n_classes).cuda()
+            decoder.train()
+            optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
+            criterionD = nn.CrossEntropyLoss()
+            
+            for ep in range(5):
+                running_lossD = 0
+                for iD, (imagesD, targetD) in enumerate(train_loader):
+                
+                    imagesD = imagesD.cuda()
+                    targetD = targetD.cuda()   
+
+                
+                    if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
+                        imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
+
+                    latentsD, _ = modelF(imagesD)
+
+                    optimizerD.zero_grad()
+                    outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
+                    lossD = criterionD(outputsD, targetD)
+                    lossD.backward()
+                    optimizerD.step()
+
+                    running_lossD += lossD.item()
+
+                # print(running_lossD/(iD+1))
+
+            latents, _ = modelF(images_noisy)
+            output = decoder(latents.view(latents.shape[0], -1).detach())
+
+
+        for _ in range(itr):
             # compute output
-            latents, output = modelF(images_noisy)
+            latents, _ = modelF(gener.detach())
+
             # ----- decoder ------------------ 
-            _,recons_before_interpolation = modelB(latents.detach()) 
+            _, recons_before_interpolation = modelB(latents.detach()) 
             recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
-            
+
             if args.method == 'SLTemplateGenerator':
                 repb = onehot.detach()#modelB(onehot.detach())
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
-                _,targetproj = modelB(repb) #, switches
+                _, targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -687,8 +798,6 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
             
                 gener = targetproj
                 reference = inputs_avgcat
-
-            
             
             elif args.method == 'SLError':
                 #TODO: check the norm of subtracts
@@ -703,7 +812,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _,gener = modelB(repb.detach())
+                _, gener = modelB(repb.detach())
                 reference = images 
 
             elif args.method == 'SLErrorTemplateGenerator':
@@ -712,86 +821,60 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                 
                 
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                        
-                        
                 _, targetproj = modelB(repb) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
                     inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
-            
+        
                 gener = targetproj
                 reference = inputs_avgcat
-
-            else:# args.method in ['SLVanilla','BP','FA']:
+            
+            else: # args.method in ['SLVanilla','BP','FA']:
                 gener = recons
                 reference = images
+        
+            if i % args.print_freq == 0 or (i == len(val_loader)):
+            # # training a linear decoder
+            
+                n_latents = latents.view(latents.shape[0], -1).shape[-1]
+                decoder = nn.Linear(n_latents, args.n_classes).cuda()
+                decoder.train()
+                optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
+                criterionD = nn.CrossEntropyLoss()
+                
+                for ep in range(5):
+                    running_lossD = 0
+                    for iD, (imagesD, targetD) in enumerate(train_loader):
+                    
+                        imagesD = imagesD.cuda()
+                        targetD = targetD.cuda()   
+
+                    
+                        if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
+                            imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
+
+                        latentsD, _ = modelF(imagesD)
+
+                        optimizerD.zero_grad()
+                        outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
+                        lossD = criterionD(outputsD, targetD)
+                        lossD.backward()
+                        optimizerD.step()
+
+                        running_lossD += lossD.item()
+
+                    # print(running_lossD/(iD+1))
+
+                latents, _ = modelF(images_noisy)
+                output = decoder(latents.view(latents.shape[0], -1).detach())
+
+        if (args.eval_save_sample_images) and not_saved_itr:
+            not_saved_itr = False
+            # helper_functions.generate_sample_images(gener, target, title='gener by '+args.method, param_dict={'sigma2':sigma2, 'itr':itr}, args=args)
 
         
-
-            for _ in range(itr):
-                # compute output
-                latents, output = modelF(gener.detach())
-
-                # ----- decoder ------------------ 
-                _, recons_before_interpolation = modelB(latents.detach()) 
-                recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
-
-                if args.method == 'SLTemplateGenerator':
-                    repb = onehot.detach()#modelB(onehot.detach())
-                    repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                            
-                            
-                    _, targetproj = modelB(repb) #, switches
-
-                    inputs_avgcat = torch.zeros_like(images)
-                    for t in torch.unique(target):
-                        inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
-                
-                    gener = targetproj
-                    reference = inputs_avgcat
-                
-                elif args.method == 'SLError':
-                    #TODO: check the norm of subtracts
-                    prob = nn.Softmax(dim=1)(output.detach())
-                    repb = onehot - prob
-                    repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                    gener = modelB(repb.detach())
-                    reference = images - F.interpolate(recons, size=images.shape[-1])
-
-                elif args.method == 'SLRobust':
-                    
-                    prob = nn.Softmax(dim=1)(output.detach())
-                    repb = onehot - prob
-                    repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                    _, gener = modelB(repb.detach())
-                    reference = images 
-
-                elif args.method == 'SLErrorTemplateGenerator':
-                    prob = nn.Softmax(dim=1)(output.detach())
-                    repb = onehot - prob#modelB(onehot.detach())
-                    
-                    
-                    repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                    _, targetproj = modelB(repb) #, switches
-
-                    inputs_avgcat = torch.zeros_like(images)
-                    for t in torch.unique(target):
-                        inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
-            
-                    gener = targetproj
-                    reference = inputs_avgcat
-                
-                else: # args.method in ['SLVanilla','BP','FA']:
-                    gener = recons
-                    reference = images
-            
-            
-            if (args.eval_save_sample_images) and not_saved_itr:
-                not_saved_itr = False
-                # helper_functions.generate_sample_images(gener, target, title='gener by '+args.method, param_dict={'sigma2':sigma2, 'itr':itr}, args=args)
-
-            
+        
             # measure accuracy and record loss
             losse = criterione(output, target) 
             acc1, acc5 = accuracy(output, target, topk=(1, 5))
@@ -809,16 +892,16 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
             batch_time.update(time.time() - end)
             end = time.time()
 
-            # if i % args.print_freq == 0:
-            #     progress.display(i)
+            if i % args.print_freq == 0:
+                progress.display(i)
 
 
-        print('Test avg {method} sigma2 {sigma2} itr: {itr} * lossd {losses.avg:.3f}'
-            .format(method=args.method, sigma2=sigma2, itr=itr,losses=losses), flush=True)
+    print('Test avg {method} sigma2 {sigma2} itr: {itr} * lossd {losses.avg:.3f}'
+        .format(method=args.method, sigma2=sigma2, itr=itr,losses=losses), flush=True)
 
-        # TODO: this should also be done with the ProgressMeter
-        print('Test avg  {method} sigma2 {sigma2} itr: {itr} * Acc@1 {top1.avg:.3f}'
-            .format(method=args.method, sigma2=sigma2, itr=itr, top1=top1), flush=True)
+    # TODO: this should also be done with the ProgressMeter
+    print('Test avg  {method} sigma2 {sigma2} itr: {itr} * Acc@1 {top1.avg:.3f}'
+        .format(method=args.method, sigma2=sigma2, itr=itr, top1=top1), flush=True)
               
 
     return modelF, modelB, [top1.avg, corr.avg, losses.avg]
