@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
-            "args": ["--method","BP", "--config-file", "/home/tahereh/Documents/Research/Results/Symbio/Symbio/Oct05-16-00_MNIST_3c45796306_RMSpropRMSpropMNISTAsymResLNet10_682/configs.yml"]
+            "args": ["--resume_training_epochs", "300","--method","SLVanilla", "--config-file", "/home/tahereh/Documents/Research/Results/Symbio/Symbio/Oct09-05-10_FashionMNIST_5b1c75a8c3_RMSpRMSpMNISTAsymResLNet10BNaffine2_74/configs.yml"]
         }
     ]
 }

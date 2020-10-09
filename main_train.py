@@ -79,15 +79,20 @@ parser.add_argument(
 parser.add_argument('--method', type=str, default='BP', metavar='M',
                     help='method:BP|SLVanilla|SLBP|FA|SLTemplateGenerator')
 
-
+parser.add_argument('--resume_training_epochs', type=int, default=0,
+                    help='if greater than 0 reads the checkpoint from rusultsdir and append results to jsons and csvs')
+parser.add_argument('--epochs', default=300, type=int, metavar='N',
+                    help='number of total epochs to run')
 args = parser.parse_args()
 assert args.config_file, 'Please specify a config file path'
 if args.config_file:
     data = yaml.load(args.config_file)
     delattr(args, 'config_file')
+    delattr(args, 'epochs')
     arg_dict = args.__dict__
     for key, value in data.items():
         setattr(args, key, value)
+    args.epochs = args.resume_training_epochs
 
 pp.pprint(arg_dict)
 print(args.method)
@@ -376,17 +381,47 @@ def main_worker(gpu, ngpus_per_node, args):
     schedulerF_original = torch.load(args.resultsdir+'scheduler%s_original.pt'%modelidentifier)
     schedulerB_original = torch.load(args.resultsdir+'schedulerB_original.pt')
 
-    modelF.load_state_dict(modelF_nottrained)
-    modelB.load_state_dict(modelB_nottrained)
+    if args.resume_training_epochs == 0:
+        modelF.load_state_dict(modelF_nottrained)
+        optimizerF.load_state_dict(optimizerF_original)        
+        optimizerF3.load_state_dict(optimizerF_original)
+        schedulerF.load_state_dict(schedulerF_original)
+        schedulerF3.load_state_dict(schedulerF_original)
+        
+    else:
+        checkpointe = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)
+        modelF_trained = checkpointe['state_dict']
+        args.start_epoch = checkpointe['epoch']
 
-    optimizerF.load_state_dict(optimizerF_original)
-    optimizerB.load_state_dict(optimizerB_original)
-    optimizerF3.load_state_dict(optimizerF_original)
+        best_acce = checkpointe['best_loss']
+        if args.gpu is not None:
+            # best_loss may be from a checkpoint from a different GPU
+            best_acce = best_acce.to(args.gpu)
+        modelF.load_state_dict(checkpointe['state_dict'])
+        optimizerF.load_state_dict(checkpointe['optimizer'])
 
-    schedulerF.load_state_dict(schedulerF_original)
-    schedulerB.load_state_dict(schedulerB_original)
+        if 'scheduler' in checkpointe.keys():
+            schedulerF.load_state_dict(checkpointe['scheduler'])
+        else:
+            schedulerF.load_state_dict(schedulerF_original)
 
-    schedulerF3.load_state_dict(schedulerF_original)
+    if args.resume_training_epochs == 0 or args.method in ['FA','BP']:  
+        modelB.load_state_dict(modelB_nottrained)   
+        optimizerB.load_state_dict(optimizerB_original) 
+        schedulerB.load_state_dict(schedulerB_original)
+
+    else:
+        checkpointd = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)
+        modelB_trained = checkpointd['state_dict']
+        optimizerB.load_state_dict(checkpointd['optimizer'])
+
+        if 'scheduler' in checkpointd.keys():
+            schedulerB.load_state_dict(checkpointd['scheduler'])
+        else:
+            schedulerB.load_state_dict(schedulerB_original)
+
+
+
     
     # Data loading code
     if args.dataset == 'imagenet':
@@ -623,6 +658,15 @@ def main_worker(gpu, ngpus_per_node, args):
         run_json_dict.update({'Test_lossl':Test_lossl_list})
 
         # save statistics
+        if args.resume_training_epochs:
+            df = pd.read_csv(args.resultsdir + 'training_results_%s.csv'%args.algorithm)
+
+            for k in results.keys():
+                if k != 'Unnamed: 0':
+                    
+                    new_item =  list(df[k]) + results[k]
+                    results.update({k: new_item})
+
         data_frame = pd.DataFrame(data=results)
         data_frame.to_csv(args.resultsdir + 'training_results_%s.csv'%args.algorithm)
 
@@ -688,6 +732,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'state_dict': modelF.state_dict(),
                 'best_loss': best_acce,
                 'optimizer' : optimizerF.state_dict(),
+                'scheduler' : schedulerF.state_dict(),
             }, is_beste, filename='checkpointe_%s.pth.tar'%args.method)
 
             if args.method.startswith('SL') or args.method == 'BSL':
@@ -697,10 +742,17 @@ def main_worker(gpu, ngpus_per_node, args):
                     'state_dict': modelB.state_dict(),
                     'best_loss': best_acce,
                     'optimizer' : optimizerB.state_dict(),
+                    'scheduler' : schedulerB.state_dict(),
                 }, is_beste,  filename='checkpointd_%s.pth.tar'%args.method)
             
-            
-            with open('%s/run_json_dict_%s.json'%(args.resultsdir, args.method), 'w') as fp:
+            if args.resume_training_epochs:
+                with open('%srun_json_dict_%s.json'%(args.resultsdir, args.method), 'r') as fp:
+                    chkp_run_json_dict = json.load(fp)
+                for k in chkp_run_json_dict.keys():
+                    new_item = chkp_run_json_dict[k] + run_json_dict[k]
+                    run_json_dict.update({k:new_item})
+
+            with open('%srun_json_dict_%s.json'%(args.resultsdir, args.method), 'w') as fp:
                 
                 json.dump(run_json_dict, fp, indent=4, sort_keys=True)        
                 fp.write("\n")
@@ -779,6 +831,7 @@ def main_worker(gpu, ngpus_per_node, args):
                     'state_dict': modelF.state_dict(),
                     'best_loss': best_acce,
                     'optimizer' : optimizerF.state_dict(),
+                    'scheduler' : schedulerF.state_dict(),
                 }, is_beste, filename='checkpointe_%s.pth.tar'%args.method)
 
                 if args.method.startswith('SL') or args.method == 'BSL':
@@ -788,10 +841,18 @@ def main_worker(gpu, ngpus_per_node, args):
                         'state_dict': modelB.state_dict(),
                         'best_loss': best_acce,
                         'optimizer' : optimizerB.state_dict(),
+                        'scheduler' : schedulerB.state_dict(),
                     }, is_beste,  filename='checkpointd_%s.pth.tar'%args.method)
                 
                 
-                with open('%s/%s/run_json_dict_%s.json'%(args.resultsdir,args.runname, args.method), 'w') as fp:
+                if args.resume_training_epochs:
+                    with open('%srun_json_dict_%s.json'%(args.resultsdir, args.method), 'r') as fp:
+                        chkp_run_json_dict = json.load(fp)
+                    for k in chkp_run_json_dict.keys():
+                        new_item = chkp_run_json_dict[k] + run_json_dict[k]
+                        run_json_dict.update({k:new_item})
+
+                with open('%srun_json_dict_%s.json'%(args.resultsdir, args.method), 'w') as fp:
                     
                     json.dump(run_json_dict, fp, indent=4, sort_keys=True)        
                     fp.write("\n")
