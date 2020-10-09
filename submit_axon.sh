@@ -20,7 +20,7 @@ module load anaconda3-2019.03
 source activate /home/tt2684/conda-envs/pytorch_tensorflow_latest
 
 now=$(date +'%Y-%m-%d_%H-%M')
-note='**Conv**'
+note='**FashionMNIST**'
 # Revisit_Asymresnet_AffineFalse
 # imagenet_with_modified_resnets_wobn1_trackFalse_wolastAcc
 # Cycle_Consistency AdvTrainingFGSM_epsilon0.2_withOUTSperateOptimizerscheduler
@@ -35,9 +35,9 @@ printf "********************************************************** \n"
 config=0
 # init='May25-14-32_CIFAR10_9fb773a12e_987' # use: -loadinitialization $init
 # Fully Connected
-# python -u create_config.py  --hash RMSpropRMSpropMNISTFullyConnE150  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-5 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 150 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
+# python -u create_config.py  --hash RMSpRMSpFaMNISTFullyConnE150  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-5 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset FashionMNIST -j16 --input_size 32 --batch-size 256 --epoch 150 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
 # Convolutional
-python -u create_config.py --hash RMSpRMSpMNISTAsymResLNet10BNaffine2 -dataset MNIST  -j 24 --input_size 32 --base_channels 64 --batch-size 512 --epoch 200 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+python -u create_config.py --hash RMSpRMSpFaMNISTAsymResLNet10BNaffPtnc30 -dataset FashionMNIST  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 200 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 30 --patienced 25 -p 100 --note  $note ; config=1  #
 
 
 
