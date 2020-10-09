@@ -1200,37 +1200,37 @@ def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args
             if (i % args.print_freq == 0) or (i == len(val_loader)):
             # # training a linear decoder
         
-            n_latents = latents.view(latents.shape[0], -1).shape[-1]
-            decoder = nn.Linear(n_latents, args.n_classes).cuda()
-            decoder.train()
-            optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
-            criterionD = nn.CrossEntropyLoss()
-            
-            for ep in range(5):
-                running_lossD = 0
-                for iD, (imagesD, targetD) in enumerate(train_loader):
+                n_latents = latents.view(latents.shape[0], -1).shape[-1]
+                decoder = nn.Linear(n_latents, args.n_classes).cuda()
+                decoder.train()
+                optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
+                criterionD = nn.CrossEntropyLoss()
                 
-                    imagesD = imagesD.cuda()
-                    targetD = targetD.cuda()   
+                for ep in range(5):
+                    running_lossD = 0
+                    for iD, (imagesD, targetD) in enumerate(train_loader):
+                    
+                        imagesD = imagesD.cuda()
+                        targetD = targetD.cuda()   
 
-                
-                    if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
-                        imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
+                    
+                        if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
+                            imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
 
-                    latentsD, _ = modelF(imagesD)
+                        latentsD, _ = modelF(imagesD)
 
-                    optimizerD.zero_grad()
-                    outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
-                    lossD = criterionD(outputsD, targetD)
-                    lossD.backward()
-                    optimizerD.step()
+                        optimizerD.zero_grad()
+                        outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
+                        lossD = criterionD(outputsD, targetD)
+                        lossD.backward()
+                        optimizerD.step()
 
-                    running_lossD += lossD.item()
+                        running_lossD += lossD.item()
 
-                # print(running_lossD/(iD+1))
+                    # print(running_lossD/(iD+1))
 
-            latents, _ = modelF(images_noisy)
-            output = decoder(latents.view(latents.shape[0], -1).detach())
+                latents, _ = modelF(images_noisy)
+                output = decoder(latents.view(latents.shape[0], -1).detach())
 
             
                     
