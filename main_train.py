@@ -92,7 +92,8 @@ if args.config_file:
     arg_dict = args.__dict__
     for key, value in data.items():
         setattr(args, key, value)
-    args.epochs = args.resume_training_epochs
+    if args.resume_training_epochs:
+        args.epochs = args.resume_training_epochs
 
 pp.pprint(arg_dict)
 print(args.method)
