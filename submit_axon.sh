@@ -37,7 +37,12 @@ config=0
 # Fully Connected
 # python -u create_config.py  --hash RMSpRMSpFaMNISTFullyConnE150  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-5 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset FashionMNIST -j16 --input_size 32 --batch-size 256 --epoch 150 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
 # Convolutional
-python -u create_config.py --hash RMSpRMSpFaMNISTAsymResLNet10BNaffPtnc30 -dataset FashionMNIST  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 200 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 30 --patienced 25 -p 100 --note  $note ; config=1  #
+# python -u create_config.py --hash MNISTAsymResLNet10BNaffPatience30 -dataset MNIST  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 200 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 30 --patienced 25 -p 100 --note  $note ; config=1  #
+# python -u create_config.py --hash FaMNISTAsymResLNet10BNaff -dataset FashionMNIST  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+
+
+
+python -u create_config.py --hash CIFAR10AsymResLNet10BNaffPatience30 -dataset CIFAR10  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 400 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 30 --patienced 20 -p 100 --note  $note ; config=1  #
 
 
 

@@ -92,7 +92,8 @@ if args.config_file:
     arg_dict = args.__dict__
     for key, value in data.items():
         setattr(args, key, value)
-    args.epochs = args.resume_training_epochs
+    if args.resume_training_epochs:
+        args.epochs = args.resume_training_epochs
 
 pp.pprint(arg_dict)
 print(args.method)
@@ -610,7 +611,7 @@ def main_worker(gpu, ngpus_per_node, args):
     Alignments_ratios_last_layer_list =  []
 
     results = {'train_acc': [],  'test_acc': [], 'train_lossd': [],  'test_lossd': [], 'train_corrd': [],  'test_corrd': []}
-    for epoch in range(args.start_epoch, args.epochs):
+    for epoch in np.arange(args.start_epoch, args.epochs):
 
         if args.distributed:
             train_sampler.set_epoch(epoch)
