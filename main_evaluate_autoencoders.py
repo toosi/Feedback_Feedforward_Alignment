@@ -360,8 +360,9 @@ def main_worker(gpu, ngpus_per_node, args):
     schedulerB = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerB, 'max', patience=args.patienced, factor=args.factord)
 
     # ------load Trained models ---------
-    modelF_trained = torch.load(args.resultsdir+'checkpointe_autoencoder_%s.pth.tar'%args.method)['state_dict']
-    modelB_trained = torch.load(args.resultsdir+'checkpointd_autoencoder_%s.pth.tar'%args.method)['state_dict']
+    if args.method in ['BP','FA']:
+        modelF_trained = torch.load(args.resultsdir+'checkpointe_autoencoder_%s.pth.tar'%args.method)['state_dict']
+        modelB_trained = torch.load(args.resultsdir+'checkpointd_autoencoder_%s.pth.tar'%args.method)['state_dict']
     
     # if args.method.startswith('SL') or args.method == 'BSL':
     #     modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
@@ -377,7 +378,10 @@ def main_worker(gpu, ngpus_per_node, args):
         
     # else:
     #     modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
-        
+    else:
+        modelF_trained = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['state_dict']
+        modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
+
     modelF.load_state_dict(modelF_trained)
     modelB.load_state_dict(modelB_trained)
 
