@@ -621,7 +621,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
         if not os.path.exists(args.resultsdir+'evaluate'):
             os.makedirs(args.resultsdir+'evaluate')
-        json_name =  '%sevaluate/%s_autoencoder_eval_maxitr%d_epsilon%0.1e_noisesigma2%s.json'%(args.resultsdir, args.method, args.eval_maxitr, args.eval_epsilon, args.eval_sigma2)
+        json_name =  '%sevaluate/%s_autoencoder_staticdecoder_eval_maxitr%d_epsilon%0.1e_noisesigma2%s.json'%(args.resultsdir, args.method, args.eval_maxitr, args.eval_epsilon, args.eval_sigma2)
         print('json saved at: ',json_name)
         with open(json_name, 'w') as fp:
             run_json_dict.update(arg_dict)
@@ -838,40 +838,10 @@ def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, a
                 gener = recons
                 reference = images
         
-        if i % args.print_freq == 0 or (i == len(val_loader)):
-        # # training a linear decoder
-        
-            n_latents = latents.view(latents.shape[0], -1).shape[-1]
-            decoder = nn.Linear(n_latents, args.n_classes).cuda()
-            decoder.train()
-            optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
-            criterionD = nn.CrossEntropyLoss()
-            
-            for ep in range(5):
-                running_lossD = 0
-                for iD, (imagesD, targetD) in enumerate(train_loader):
-                
-                    imagesD = imagesD.cuda()
-                    targetD = targetD.cuda()   
-
-                
-                    if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
-                        imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
-
-                    latentsD, _ = modelF(imagesD)
-
-                    optimizerD.zero_grad()
-                    outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
-                    lossD = criterionD(outputsD, targetD)
-                    lossD.backward()
-                    optimizerD.step()
-
-                    running_lossD += lossD.item()
-
                 # print(running_lossD/(iD+1))
 
-            latents, _ = modelF(images_noisy)
-            output = decoder(latents.view(latents.shape[0], -1).detach())
+        latents, _ = modelF(gener)
+        output = decoder(latents.view(latents.shape[0], -1).detach())
 
         if (args.eval_save_sample_images) and not_saved_itr:
             not_saved_itr = False

@@ -360,35 +360,30 @@ def main_worker(gpu, ngpus_per_node, args):
     schedulerB = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerB, 'max', patience=args.patienced, factor=args.factord)
 
     # ------load Trained models ---------
-    if args.method in ['BP','FA']:
-        modelF_trained = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['state_dict']
+    modelF_trained = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['state_dict']
+
+    if args.method == 'BP':
         
         
         modelB_trained = toggle_state_dict(modelF_trained)
         if args.arche.startswith('FullyConn'):
             
             modelB_trained = state_dict_utils.toggle_weights(modelB.state_dict(), modelF_trained)
-        
-    # if args.method.startswith('SL') or args.method == 'BSL':
-    #     modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
-    # else:
-    #     modelB_trained = toggle_state_dict_BPtoYY(modelF_trained, modelB.state_dict())
+        modelB.load_state_dict(modelB_trained)
+
+    elif args.method == 'FA':
+        modelB_nottrained = torch.load(args.resultsdir+'modelB_untrained.pt')
+
+        modelB.load_state_dict(modelB_nottrained)
     
-    # if args.algorithm in ['BP','FA']:
-        
-    #     modelB_trained = toggle_state_dict(modelF_trained)
-    #     if args.arche.startswith('FullyConn'):
-            
-    #         modelB_trained = state_dict_utils.toggle_weights(modelB.state_dict(), modelF_trained)
         
     # else:
     #     modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
     else:
-        modelF_trained = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['state_dict']
         modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
+        modelB.load_state_dict(modelB_trained)
 
     modelF.load_state_dict(modelF_trained)
-    modelB.load_state_dict(modelB_trained)
 
     
     # Data loading code
