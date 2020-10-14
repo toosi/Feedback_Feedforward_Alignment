@@ -392,57 +392,57 @@ class AsymLNet5B(nn.Module):
 
 
 class AsymResLNet14F(nn.Module):
-    def __init__(self, image_channels=3, n_classes = 10, kernel_size=7, stride=2 , base_channels=64, algorithm='FA', normalization='BatchNorm2d',): 
+    def __init__(self, image_channels=3, n_classes = 10, kernel_size=7, stride=2 , base_channels=64, algorithm='FA', normalization='BatchNorm2d',normalization_affine=False): 
         super(AsymResLNet14F, self).__init__()
         self.n_classes = n_classes 
         self.base_channels = base_channels
         self.conv1 = Conv2d(image_channels, self.base_channels, kernel_size=kernel_size, stride=stride, padding=3, bias=False, algorithm=algorithm, )
-        self.bn1 = getattr(nn, normalization)(self.base_channels, momentum=0.1, track_running_stats=False)
+        self.bn1 = getattr(nn, normalization)(self.base_channels, momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.relu = nn.ReLU(inplace=True)
 
         # layer 1
         self.conv11 = Conv2d(self.base_channels, self.base_channels, kernel_size=3, stride=1, groups=1, padding=1, algorithm=algorithm, )
-        self.bn11 = getattr(nn, normalization)(self.base_channels,momentum=0.1, track_running_stats=False)
+        self.bn11 = getattr(nn, normalization)(self.base_channels,momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.relu = nn.ReLU(inplace=True)
         self.conv12 = Conv2d(self.base_channels, self.base_channels, kernel_size=3,stride=1, padding=1, algorithm=algorithm, )
-        self.bn12 = getattr(nn, normalization)(self.base_channels, momentum=0.1,track_running_stats=False)
+        self.bn12 = getattr(nn, normalization)(self.base_channels, momentum=0.1,track_running_stats=False, affine=normalization_affine)
 
         self.conv21 = Conv2d(self.base_channels, self.base_channels, kernel_size=3,stride=1, padding=1, algorithm=algorithm, )
-        self.bn21 = getattr(nn, normalization)(self.base_channels, momentum=0.1,track_running_stats=False)
+        self.bn21 = getattr(nn, normalization)(self.base_channels, momentum=0.1,track_running_stats=False, affine=normalization_affine)
         self.relu = nn.ReLU(inplace=True)
         self.conv22 = Conv2d(self.base_channels, self.base_channels*2, kernel_size=3, stride=1, padding=1, algorithm=algorithm,)
-        self.bn22 = getattr(nn, normalization)(self.base_channels*2, momentum=0.1, track_running_stats=False)
+        self.bn22 = getattr(nn, normalization)(self.base_channels*2, momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.downsample1 =  Conv2d(self.base_channels, self.base_channels*2,kernel_size=1, stride=1, padding=0, algorithm=algorithm, )
-        self.bn23 = getattr(nn, normalization)(self.base_channels*2,momentum=0.1, track_running_stats=False)
+        self.bn23 = getattr(nn, normalization)(self.base_channels*2,momentum=0.1, track_running_stats=False, affine=normalization_affine)
 
         # layer 2
         self.conv31 = Conv2d(self.base_channels*2, self.base_channels*2, kernel_size=3, stride=1, groups=1, padding=1, algorithm=algorithm, )
-        self.bn31 = getattr(nn, normalization)(self.base_channels*2,momentum=0.1, track_running_stats=False)
+        self.bn31 = getattr(nn, normalization)(self.base_channels*2,momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.relu = nn.ReLU(inplace=True)
         self.conv32 = Conv2d(self.base_channels*2, self.base_channels*2, kernel_size=3,stride=1, padding=1, algorithm=algorithm,  )
-        self.bn32 = getattr(nn, normalization)(self.base_channels*2, momentum=0.1,track_running_stats=False)
+        self.bn32 = getattr(nn, normalization)(self.base_channels*2, momentum=0.1,track_running_stats=False, affine=normalization_affine)
 
         self.conv41 = Conv2d(self.base_channels*2, self.base_channels*2, kernel_size=3,stride=1, padding=1, algorithm=algorithm,  )
-        self.bn41 = getattr(nn, normalization)(self.base_channels*2, momentum=0.1,track_running_stats=False)
+        self.bn41 = getattr(nn, normalization)(self.base_channels*2, momentum=0.1,track_running_stats=False, affine=normalization_affine)
         self.relu = nn.ReLU(inplace=True)
         self.conv42 = Conv2d(self.base_channels*2, self.base_channels*4, kernel_size=3, stride=2, padding=1, algorithm=algorithm,  )
-        self.bn42 = getattr(nn, normalization)(self.base_channels*4, momentum=0.1, track_running_stats=False)
+        self.bn42 = getattr(nn, normalization)(self.base_channels*4, momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.downsample2 =  Conv2d(self.base_channels*2, self.base_channels*4,kernel_size=1, stride=2, padding=0, algorithm=algorithm,  )
-        self.bn43 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False)
+        self.bn43 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False, affine=normalization_affine)
 
 
         # layer 3
         self.conv51 = Conv2d(self.base_channels*4, self.base_channels*4, kernel_size=3, stride=1, groups=1, padding=1, algorithm=algorithm,  )
-        self.bn51 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False)
+        self.bn51 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.relu = nn.ReLU(inplace=True)
         self.conv52 = Conv2d(self.base_channels*4, self.base_channels*4, kernel_size=3, stride=1, padding=1, algorithm=algorithm,  )
-        self.bn52 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False)
+        self.bn52 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False, affine=normalization_affine)
 
         self.conv61 = Conv2d(self.base_channels*4, self.base_channels*4,  kernel_size=3, stride=1, padding=1, algorithm=algorithm,  )
-        self.bn61 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False)
+        self.bn61 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.relu = nn.ReLU(inplace=True)
         self.conv62 = Conv2d(self.base_channels*4, self.n_classes, kernel_size=3, stride=2, padding=1, algorithm=algorithm,  )
-        self.bn62 = getattr(nn, normalization)(self.n_classes, momentum=0.1, track_running_stats=False)
+        self.bn62 = getattr(nn, normalization)(self.n_classes, momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.downsample3 =  Conv2d(self.base_channels*4, self.n_classes, kernel_size=1, stride=2, padding=0,  algorithm=algorithm,  )
         # self.bn43 = nn.BatchNorm2d(self.base_channels*4,momentum=0.1, track_running_stats=False)
 
@@ -517,7 +517,7 @@ class AsymResLNet14F(nn.Module):
 
 
 class AsymResLNet14B(nn.Module):
-    def __init__(self, image_channels=3, n_classes=10, algorithm='FA', kernel_size=7, stride=2 ,base_channels=64, normalization='BatchNorm2d', ):
+    def __init__(self, image_channels=3, n_classes=10, algorithm='FA', kernel_size=7, stride=2 ,base_channels=64, normalization='BatchNorm2d',normalization_affine=False ):
         super(AsymResLNet14B, self).__init__()
         self.base_channels = base_channels
         self.n_classes = n_classes
@@ -526,51 +526,51 @@ class AsymResLNet14B(nn.Module):
          # layer 3
         # self.bn43 = nn.BatchNorm2d(self.base_channels*4,momentum=0.1, track_running_stats=False)
         self.upsample3 =  ConvTranspose2d(self.n_classes, self.base_channels*4,kernel_size=1, stride=2, padding=0, output_padding=0, algorithm=algorithm,  )
-        self.bn62 = getattr(nn, normalization)(self.n_classes,momentum=0.1, track_running_stats=False)
+        self.bn62 = getattr(nn, normalization)(self.n_classes,momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.conv62 = ConvTranspose2d(self.n_classes, self.base_channels*4, kernel_size=3,stride=2,  padding=1, output_padding=0, algorithm=algorithm,  )
         self.relu = nn.ReLU(inplace=True)
-        self.bn61 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False)
+        self.bn61 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.conv61 = ConvTranspose2d(self.base_channels*4, self.base_channels*4, stride=1, kernel_size=3, padding=1, output_padding=0, algorithm=algorithm,  )
-        self.bn52 = getattr(nn, normalization)(self.base_channels*4, momentum=0.1, track_running_stats=False)
+        self.bn52 = getattr(nn, normalization)(self.base_channels*4, momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.conv52 = ConvTranspose2d(self.base_channels*4, self.base_channels*4, kernel_size=3,stride=1,  padding=1, output_padding=0, algorithm=algorithm,  )
         self.relu = nn.ReLU(inplace=True)
-        self.bn51 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False)
+        self.bn51 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.conv51 = ConvTranspose2d(self.base_channels*4, self.base_channels*4, kernel_size=3, stride=1, groups=1, padding=1, output_padding=0, algorithm=algorithm,  ) #output_padding=1
 
 
         # layer 2
-        self.bn43 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False)
+        self.bn43 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.upsample2 =  ConvTranspose2d(self.base_channels*4, self.base_channels*2,kernel_size=1, stride=2, padding=0,output_padding=0, algorithm=algorithm,  )
-        self.bn42 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False)
+        self.bn42 = getattr(nn, normalization)(self.base_channels*4,momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.conv42 = ConvTranspose2d(self.base_channels*4, self.base_channels*2, kernel_size=3, stride=2, padding=1, output_padding=0, algorithm=algorithm,  )
         self.relu = nn.ReLU(inplace=True)
-        self.bn41 = getattr(nn, normalization)(self.base_channels*2, momentum=0.1,track_running_stats=False)
+        self.bn41 = getattr(nn, normalization)(self.base_channels*2, momentum=0.1,track_running_stats=False, affine=normalization_affine)
         self.conv41 = ConvTranspose2d(self.base_channels*2, self.base_channels*2, stride=1, kernel_size=3, padding=1, output_padding=0, algorithm=algorithm,  )
-        self.bn32 = getattr(nn, normalization)(self.base_channels*2, momentum=0.1, track_running_stats=False)
+        self.bn32 = getattr(nn, normalization)(self.base_channels*2, momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.conv32 = ConvTranspose2d(self.base_channels*2, self.base_channels*2, kernel_size=3,stride=1,  padding=1, output_padding=0, algorithm=algorithm,  )
         self.relu = nn.ReLU(inplace=True)
-        self.bn31 = getattr(nn, normalization)(self.base_channels*2, momentum=0.1,track_running_stats=False)
+        self.bn31 = getattr(nn, normalization)(self.base_channels*2, momentum=0.1,track_running_stats=False, affine=normalization_affine)
         self.conv31 = ConvTranspose2d(self.base_channels*2, self.base_channels*2, kernel_size=3, stride=1, groups=1, padding=1, output_padding=0, algorithm=algorithm,  )
 
 
         # layer 1
-        self.bn23 = getattr(nn, normalization)(self.base_channels*2,momentum=0.1, track_running_stats=False)
+        self.bn23 = getattr(nn, normalization)(self.base_channels*2,momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.upsample1 =  ConvTranspose2d(self.base_channels*2, self.base_channels,kernel_size=1, stride=1, padding=0,output_padding=0, algorithm=algorithm,  )
-        self.bn22 = getattr(nn, normalization)(self.base_channels*2,momentum=0.1, track_running_stats=False)
+        self.bn22 = getattr(nn, normalization)(self.base_channels*2,momentum=0.1, track_running_stats=False, affine=normalization_affine)
         self.conv22 = ConvTranspose2d(self.base_channels*2, self.base_channels, kernel_size=3, stride=1, padding=1, output_padding=0, algorithm=algorithm,  )
         self.relu = nn.ReLU(inplace=True)
-        self.bn21 = getattr(nn, normalization)(self.base_channels, momentum=0.1,track_running_stats=False)
+        self.bn21 = getattr(nn, normalization)(self.base_channels, momentum=0.1,track_running_stats=False, affine=normalization_affine)
         self.conv21 = ConvTranspose2d(self.base_channels, self.base_channels, stride=1, kernel_size=3, padding=1, output_padding=0, algorithm=algorithm,  )
-        self.bn12 = getattr(nn, normalization)(self.base_channels, momentum=0.1,track_running_stats=False)
+        self.bn12 = getattr(nn, normalization)(self.base_channels, momentum=0.1,track_running_stats=False, affine=normalization_affine)
 
         self.conv12 = ConvTranspose2d(self.base_channels, self.base_channels, kernel_size=3,stride=1,  padding=1, output_padding=0, algorithm=algorithm,  )
         self.relu = nn.ReLU(inplace=True)
-        self.bn11 = getattr(nn, normalization)(self.base_channels, momentum=0.1,track_running_stats=False)
+        self.bn11 = getattr(nn, normalization)(self.base_channels, momentum=0.1,track_running_stats=False, affine=normalization_affine)
         self.conv11 = ConvTranspose2d(self.base_channels, self.base_channels, kernel_size=3, stride=1, groups=1, padding=1, output_padding=0, algorithm=algorithm,  )
 
 
         self.relu = nn.ReLU(inplace=True)
-        self.bn1 = getattr(nn, normalization)(self.base_channels, momentum=0.1,track_running_stats=False)
+        self.bn1 = getattr(nn, normalization)(self.base_channels, momentum=0.1,track_running_stats=False, affine=normalization_affine)
         self.conv1 = ConvTranspose2d(self.base_channels, image_channels , kernel_size=kernel_size, stride=stride, padding=2, bias=False, output_padding=0, algorithm=algorithm,  ) #output_padding=1
         
 
@@ -628,11 +628,11 @@ class AsymResLNet14B(nn.Module):
         x = self.relu(x)
         
 
-        x = self.relu(self.bn1(x))
-        x = self.conv1(x)
+        preconv1 = self.relu(self.bn1(x))
+        x = self.conv1(preconv1)
 
 
-        return x
+        return preconv1, x
 
 
 #----------------- stochastic discrimination -------------------------

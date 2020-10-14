@@ -202,6 +202,12 @@ elif args.dataset == 'CIFAR100':
     args.n_classes = 100
     input_size = 32
     image_channels = 3
+if args.dataset == 'STL10':
+    args.n_classes = 10
+    input_size = 96
+    image_channels = 3
+    train_mean = (0.4313, 0.4156, 0.3663)
+    train_std = (0.2683, 0.2610, 0.2687)
     
 elif 'MNIST' in args.dataset:
     args.n_classes = 10

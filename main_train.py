@@ -209,6 +209,13 @@ def main_worker(gpu, ngpus_per_node, args):
 
         train_mean = (0.5070751592371323, 0.48654887331495095, 0.4409178433670343)
         train_std = (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
+    
+    if args.dataset == 'STL10':
+        args.n_classes = 10
+        input_size = 96
+        image_channels = 3
+        train_mean = (0.4313, 0.4156, 0.3663)
+        train_std = (0.2683, 0.2610, 0.2687)
 
         
     elif 'MNIST' in args.dataset:
@@ -488,6 +495,33 @@ def main_worker(gpu, ngpus_per_node, args):
         test_dataset = getattr(datasets, args.dataset)(root=args.imagesetdir, train=False, download=True, transform=transform_test)
         val_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, drop_last=True)
 
+    elif 'STL' in args.dataset:
+
+        transform_train = transforms.Compose([
+        transforms.RandomResizedCrop(input_size),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize(train_mean, train_std),
+        ])
+
+        transform_test = transforms.Compose([
+            transforms.RandomResizedCrop(input_size),
+            transforms.ToTensor(),
+            transforms.Normalize(train_mean, train_std),
+        ])
+
+        train_dataset = getattr(datasets, args.dataset)(root=args.imagesetdir, split='train', download=True, transform=transform_train)
+        if args.distributed:
+            train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        else:
+            train_sampler = None
+        
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,sampler=train_sampler, shuffle=(train_sampler is None), num_workers=args.workers, drop_last=True)
+
+        test_dataset = getattr(datasets, args.dataset)(root=args.imagesetdir, split='test', download=True, transform=transform_test)
+        val_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, drop_last=True)
 
         
     
