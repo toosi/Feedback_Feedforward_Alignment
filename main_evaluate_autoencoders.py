@@ -683,11 +683,47 @@ def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, a
         
         if (args.eval_save_sample_images) and not_saved:
             not_saved = False
-            # helper_functions.generate_sample_images(images, target, title='original', param_dict={}, args=args)
-            # helper_functions.generate_sample_images(images_noisy, target, title='noisy inputs', param_dict={'sigma2':sigma2}, args=args)
+            helper_functions.generate_sample_images(images, target, title='original', param_dict={}, args=args)
+            helper_functions.generate_sample_images(images_noisy, target, title='noisy inputs', param_dict={'sigma2':sigma2}, args=args)
 
         # compute output
         latents, _ = modelF(images_noisy)
+        
+        if (i % args.print_freq == 0) or (i == len(val_loader)):
+            # # training a linear decoder
+        
+            n_latents = latents.view(latents.shape[0], -1).shape[-1]
+            decoder = nn.Linear(n_latents, args.n_classes).cuda()
+            decoder.train()
+            optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
+            criterionD = nn.CrossEntropyLoss()
+            
+            for ep in range(5):
+                running_lossD = 0
+                for iD, (imagesD, targetD) in enumerate(train_loader):
+                
+                    imagesD = imagesD.cuda()
+                    targetD = targetD.cuda()   
+
+                
+                    if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
+                        imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
+
+                    latentsD, _ = modelF(imagesD)
+
+                    optimizerD.zero_grad()
+                    outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
+                    lossD = criterionD(outputsD, targetD)
+                    lossD.backward()
+                    optimizerD.step()
+
+                    running_lossD += lossD.item()
+
+                # print(running_lossD/(iD+1))
+
+            latents, _ = modelF(images_noisy)
+            output = decoder(latents.view(latents.shape[0], -1).detach())
+
         # ----- decoder ------------------ 
         _, recons_before_interpolation = modelB(latents.detach()) 
         recons = F.interpolate(recons_before_interpolation, size=images.shape[-1])
@@ -744,42 +780,6 @@ def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, a
         else:# args.method in ['SLVanilla','BP','FA']:
             gener = recons
             reference = images
-
-        if (i % args.print_freq == 0) or (i == len(val_loader)):
-            # # training a linear decoder
-        
-            n_latents = latents.view(latents.shape[0], -1).shape[-1]
-            decoder = nn.Linear(n_latents, args.n_classes).cuda()
-            decoder.train()
-            optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
-            criterionD = nn.CrossEntropyLoss()
-            
-            for ep in range(5):
-                running_lossD = 0
-                for iD, (imagesD, targetD) in enumerate(train_loader):
-                
-                    imagesD = imagesD.cuda()
-                    targetD = targetD.cuda()   
-
-                
-                    if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
-                        imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
-
-                    latentsD, _ = modelF(imagesD)
-
-                    optimizerD.zero_grad()
-                    outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
-                    lossD = criterionD(outputsD, targetD)
-                    lossD.backward()
-                    optimizerD.step()
-
-                    running_lossD += lossD.item()
-
-                # print(running_lossD/(iD+1))
-
-            latents, _ = modelF(images_noisy)
-            output = decoder(latents.view(latents.shape[0], -1).detach())
-
 
         for _ in range(itr):
             # compute output
@@ -845,7 +845,7 @@ def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, a
 
         if (args.eval_save_sample_images) and not_saved_itr:
             not_saved_itr = False
-            # helper_functions.generate_sample_images(gener, target, title='gener by '+args.method, param_dict={'sigma2':sigma2, 'itr':itr}, args=args)
+            helper_functions.generate_sample_images(gener.detach(), target, title='gener by %s autoencoder'%args.method, param_dict={'sigma2':sigma2, 'itr':itr}, args=args)
 
         
         
@@ -933,333 +933,333 @@ def fgsm_attack(image, epsilon, data_grad):
     return perturbed_image
 
 
-def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args, itr):
+# def validate_robustness(val_loader, modelF, modelB, criterione, criteriond, args, itr):
 
     
-    batch_time = AverageMeter('Time', ':6.3f')
-    losses = AverageMeter('Loss', ':.4e')
+#     batch_time = AverageMeter('Time', ':6.3f')
+#     losses = AverageMeter('Loss', ':.4e')
 
-    corr = AverageMeter('corr', ':6.2f')
-    top1 = AverageMeter('Acc@1', ':6.2f')
-    m1, m2 = top1, corr
+#     corr = AverageMeter('corr', ':6.2f')
+#     top1 = AverageMeter('Acc@1', ':6.2f')
+#     m1, m2 = top1, corr
 
-    progress = ProgressMeter(
-        len(val_loader),
-        [batch_time, losses, m1, m2],
-        prefix='Test %s: '%args.method)
+#     progress = ProgressMeter(
+#         len(val_loader),
+#         [batch_time, losses, m1, m2],
+#         prefix='Test %s: '%args.method)
 
-    if args.gpu is not None:
+#     if args.gpu is not None:
         
-        onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda(args.gpu, non_blocking=True)
-    else:
-        onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda()
+#         onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda(args.gpu, non_blocking=True)
+#     else:
+#         onehot = torch.FloatTensor(args.batch_size, args.n_classes).cuda()
 
 
 
-    # switch to evaluate mode
-    modelF.eval()
-    modelB.eval()
+#     # switch to evaluate mode
+#     modelF.eval()
+#     modelB.eval()
 
-    not_saved = True
-    not_saved_itr = True
+#     not_saved = True
+#     not_saved_itr = True
 
     
-    end = time.time()
-    for i, (images, target) in enumerate(val_loader):
+#     end = time.time()
+#     for i, (images, target) in enumerate(val_loader):
 
         
-        if args.gpu is not None:
-            images = images.cuda(args.gpu, non_blocking=True)
-            target = target.cuda(args.gpu, non_blocking=True)
-        else:
-            images = images.cuda()
-            target = target.cuda()
+#         if args.gpu is not None:
+#             images = images.cuda(args.gpu, non_blocking=True)
+#             target = target.cuda(args.gpu, non_blocking=True)
+#         else:
+#             images = images.cuda()
+#             target = target.cuda()
 
-        onehot.zero_()
-        onehot.scatter_(1, target.view(target.shape[0], 1), 1)
+#         onehot.zero_()
+#         onehot.scatter_(1, target.view(target.shape[0], 1), 1)
 
         
-        if 'MNIST' in args.dataset and args.arche[0:2]!='FC':
-            images= images.expand(-1, 1, -1, -1) #images.expand(-1, 3, -1, -1)
+#         if 'MNIST' in args.dataset and args.arche[0:2]!='FC':
+#             images= images.expand(-1, 1, -1, -1) #images.expand(-1, 3, -1, -1)
         
-        images.requires_grad = True
+#         images.requires_grad = True
 
-        # ----- encoder ---------------------
+#         # ----- encoder ---------------------
                     
-        # compute output
-        _, output = modelF(images)
+#         # compute output
+#         _, output = modelF(images)
 
-        # # If the initial prediction is wrong, dont bother attacking, just move on
-        # init_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability     
-        # if init_pred.item() != target.item():
-        #     continue
+#         # # If the initial prediction is wrong, dont bother attacking, just move on
+#         # init_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability     
+#         # if init_pred.item() != target.item():
+#         #     continue
 
-        losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
+#         losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
 
-        # Zero all existing gradients
-        modelF.zero_grad()
+#         # Zero all existing gradients
+#         modelF.zero_grad()
 
-        # Calculate gradients of model in backward pass
-        losse.backward()
+#         # Calculate gradients of model in backward pass
+#         losse.backward()
 
-        # Collect datagrad
-        images_grad = images.grad.data
+#         # Collect datagrad
+#         images_grad = images.grad.data
 
-        # Call FGSM Attack
-        perturbed_images = fgsm_attack(images, args.eval_epsilon, images_grad)
-        latents, _ = modelF(perturbed_images)
+#         # Call FGSM Attack
+#         perturbed_images = fgsm_attack(images, args.eval_epsilon, images_grad)
+#         latents, _ = modelF(perturbed_images)
 
-        if (args.eval_save_sample_images) and not_saved:
-                not_saved = False
-                # helper_functions.generate_sample_images(images.detach(), target, title='original', param_dict={}, args=args)
-                # helper_functions.generate_sample_images(perturbed_images.detach(), target, title='perturbed inputs by %s'%args.method, param_dict={'epsilon':args.eval_epsilon}, args=args)
+#         if (args.eval_save_sample_images) and not_saved:
+#                 not_saved = False
+#                 helper_functions.generate_sample_images(images.detach(), target, title='original', param_dict={}, args=args)
+#                 helper_functions.generate_sample_images(perturbed_images.detach(), target, title='perturbed inputs by %s'%args.method, param_dict={'epsilon':args.eval_epsilon}, args=args)
 
-        # losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
+#         # losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
 
-        # # measure accuracy and record loss
-        # acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        # top1.update(acc1[0].item(), images.size(0))
-        if (i % args.print_freq == 0) or (i == len(val_loader)):
-            # # training a linear decoder
+#         # # measure accuracy and record loss
+#         # acc1, acc5 = accuracy(output, target, topk=(1, 5))
+#         # top1.update(acc1[0].item(), images.size(0))
+#         if (i % args.print_freq == 0) or (i == len(val_loader)):
+#             # # training a linear decoder
         
-            n_latents = latents.view(latents.shape[0], -1).shape[-1]
-            decoder = nn.Linear(n_latents, args.n_classes).cuda()
-            decoder.train()
-            optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
-            criterionD = nn.CrossEntropyLoss()
+#             n_latents = latents.view(latents.shape[0], -1).shape[-1]
+#             decoder = nn.Linear(n_latents, args.n_classes).cuda()
+#             decoder.train()
+#             optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
+#             criterionD = nn.CrossEntropyLoss()
             
-            for ep in range(5):
-                running_lossD = 0
-                for iD, (imagesD, targetD) in enumerate(train_loader):
+#             for ep in range(5):
+#                 running_lossD = 0
+#                 for iD, (imagesD, targetD) in enumerate(train_loader):
                 
-                    imagesD = imagesD.cuda()
-                    targetD = targetD.cuda()   
+#                     imagesD = imagesD.cuda()
+#                     targetD = targetD.cuda()   
 
                 
-                    if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
-                        imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
+#                     if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
+#                         imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
 
-                    latentsD, _ = modelF(imagesD)
+#                     latentsD, _ = modelF(imagesD)
 
-                    optimizerD.zero_grad()
-                    outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
-                    lossD = criterionD(outputsD, targetD)
-                    lossD.backward()
-                    optimizerD.step()
+#                     optimizerD.zero_grad()
+#                     outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
+#                     lossD = criterionD(outputsD, targetD)
+#                     lossD.backward()
+#                     optimizerD.step()
 
-                    running_lossD += lossD.item()
+#                     running_lossD += lossD.item()
 
-                # print(running_lossD/(iD+1))
+#                 # print(running_lossD/(iD+1))
 
-            latents, _ = modelF(images_noisy)
-            output = decoder(latents.view(latents.shape[0], -1).detach())
+#             latents, _ = modelF(images_noisy)
+#             output = decoder(latents.view(latents.shape[0], -1).detach())
 
-        # ----- decoder ------------------ 
-        _, recons = modelB(latents.detach())
+#         # ----- decoder ------------------ 
+#         _, recons = modelB(latents.detach())
 
         
-        if args.method == 'SLTemplateGenerator':
-            repb = onehot.detach()#modelB(onehot.detach())           
-            repb = repb.view(args.batch_size, args.n_classes, 1, 1)                   
+#         if args.method == 'SLTemplateGenerator':
+#             repb = onehot.detach()#modelB(onehot.detach())           
+#             repb = repb.view(args.batch_size, args.n_classes, 1, 1)                   
                     
-            _, targetproj = modelB(repb) #, switches
+#             _, targetproj = modelB(repb) #, switches
 
-            inputs_avgcat = torch.zeros_like(images)
-            for t in torch.unique(target):
-                inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
+#             inputs_avgcat = torch.zeros_like(images)
+#             for t in torch.unique(target):
+#                 inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
         
-            gener = targetproj
-            reference = inputs_avgcat
+#             gener = targetproj
+#             reference = inputs_avgcat
 
 
         
-        elif args.method == 'SLError':
-            #TODO: check the norm of subtracts
-            prob = nn.Softmax(dim=1)(output.detach())
-            repb = onehot - prob
-            repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-            _, gener = modelB(repb.detach())
-            reference = images - F.interpolate(gener, size=images.shape[-1])
+#         elif args.method == 'SLError':
+#             #TODO: check the norm of subtracts
+#             prob = nn.Softmax(dim=1)(output.detach())
+#             repb = onehot - prob
+#             repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+#             _, gener = modelB(repb.detach())
+#             reference = images - F.interpolate(gener, size=images.shape[-1])
 
-        elif args.method == 'SLRobust':
+#         elif args.method == 'SLRobust':
             
-            prob = nn.Softmax(dim=1)(output.detach())
-            repb = onehot - prob
-            repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-            _, gener = modelB(repb.detach())
-            reference = images 
+#             prob = nn.Softmax(dim=1)(output.detach())
+#             repb = onehot - prob
+#             repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+#             _, gener = modelB(repb.detach())
+#             reference = images 
 
-        elif args.method == 'SLErrorTemplateGenerator':
-            prob = nn.Softmax(dim=1)(output.detach())
-            repb = onehot - prob#modelB(onehot.detach())
+#         elif args.method == 'SLErrorTemplateGenerator':
+#             prob = nn.Softmax(dim=1)(output.detach())
+#             repb = onehot - prob#modelB(onehot.detach())
             
             
-            repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+#             repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                     
                     
-            _, targetproj = modelB(repb) #, switches
+#             _, targetproj = modelB(repb) #, switches
 
-            inputs_avgcat = torch.zeros_like(images)
-            for t in torch.unique(target):
-                inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
+#             inputs_avgcat = torch.zeros_like(images)
+#             for t in torch.unique(target):
+#                 inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
         
-            gener = targetproj
-            reference = inputs_avgcat
+#             gener = targetproj
+#             reference = inputs_avgcat
         
-        else: #args.method in ['SLVanilla','BP','FA']:
-            gener = recons
-            reference = images
+#         else: #args.method in ['SLVanilla','BP','FA']:
+#             gener = recons
+#             reference = images
         
         
 
-        for _ in range(itr):
+#         for _ in range(itr):
 
-            # compute output
-            latents, _ = modelF(gener.detach())
-            # ----- decoder ------------------ 
-            _, recons = modelB(latents.detach())
+#             # compute output
+#             latents, _ = modelF(gener.detach())
+#             # ----- decoder ------------------ 
+#             _, recons = modelB(latents.detach())
 
-            if args.method == 'SLTemplateGenerator':
+#             if args.method == 'SLTemplateGenerator':
 
-                repb = onehot.detach() #modelB(onehot.detach())    
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+#                 repb = onehot.detach() #modelB(onehot.detach())    
+#                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                                   
-                _, targetproj = modelB(repb) #, switches
+#                 _, targetproj = modelB(repb) #, switches
 
-                inputs_avgcat = torch.zeros_like(images)
-                for t in torch.unique(target):
-                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
+#                 inputs_avgcat = torch.zeros_like(images)
+#                 for t in torch.unique(target):
+#                     inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
             
-                gener = targetproj
-                reference = inputs_avgcat
+#                 gener = targetproj
+#                 reference = inputs_avgcat
 
             
-            elif args.method == 'SLError':
+#             elif args.method == 'SLError':
 
-                #TODO: check the norm of subtracts
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _, gener = modelB(repb.detach())
-                reference = images - F.interpolate(recons, size=images.shape[-1])
+#                 #TODO: check the norm of subtracts
+#                 prob = nn.Softmax(dim=1)(output.detach())
+#                 repb = onehot - prob
+#                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+#                 _, gener = modelB(repb.detach())
+#                 reference = images - F.interpolate(recons, size=images.shape[-1])
 
-            elif args.method == 'SLRobust':
+#             elif args.method == 'SLRobust':
                 
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _, gener = modelB(repb.detach())
-                reference = images 
+#                 prob = nn.Softmax(dim=1)(output.detach())
+#                 repb = onehot - prob
+#                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+#                 _, gener = modelB(repb.detach())
+#                 reference = images 
 
-            elif args.method == 'SLErrorTemplateGenerator':
+#             elif args.method == 'SLErrorTemplateGenerator':
 
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob#modelB(onehot.detach())
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
+#                 prob = nn.Softmax(dim=1)(output.detach())
+#                 repb = onehot - prob#modelB(onehot.detach())
+#                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
-                _, targetproj = modelB(repb) #, switches
+#                 _, targetproj = modelB(repb) #, switches
 
-                inputs_avgcat = torch.zeros_like(images)
-                for t in torch.unique(target):
-                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
+#                 inputs_avgcat = torch.zeros_like(images)
+#                 for t in torch.unique(target):
+#                     inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
             
-                gener = targetproj
-                reference = inputs_avgcat
+#                 gener = targetproj
+#                 reference = inputs_avgcat
             
-            else: # args.method in ['SLVanilla','BP','FA']:
-                gener = recons
-                reference = images
+#             else: # args.method in ['SLVanilla','BP','FA']:
+#                 gener = recons
+#                 reference = images
 
-            if (i % args.print_freq == 0) or (i == len(val_loader)):
-            # # training a linear decoder
+#             if (i % args.print_freq == 0) or (i == len(val_loader)):
+#             # # training a linear decoder
         
-                n_latents = latents.view(latents.shape[0], -1).shape[-1]
-                decoder = nn.Linear(n_latents, args.n_classes).cuda()
-                decoder.train()
-                optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
-                criterionD = nn.CrossEntropyLoss()
+#                 n_latents = latents.view(latents.shape[0], -1).shape[-1]
+#                 decoder = nn.Linear(n_latents, args.n_classes).cuda()
+#                 decoder.train()
+#                 optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
+#                 criterionD = nn.CrossEntropyLoss()
                 
-                for ep in range(5):
-                    running_lossD = 0
-                    for iD, (imagesD, targetD) in enumerate(train_loader):
+#                 for ep in range(5):
+#                     running_lossD = 0
+#                     for iD, (imagesD, targetD) in enumerate(train_loader):
                     
-                        imagesD = imagesD.cuda()
-                        targetD = targetD.cuda()   
+#                         imagesD = imagesD.cuda()
+#                         targetD = targetD.cuda()   
 
                     
-                        if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
-                            imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
+#                         if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
+#                             imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
 
-                        latentsD, _ = modelF(imagesD)
+#                         latentsD, _ = modelF(imagesD)
 
-                        optimizerD.zero_grad()
-                        outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
-                        lossD = criterionD(outputsD, targetD)
-                        lossD.backward()
-                        optimizerD.step()
+#                         optimizerD.zero_grad()
+#                         outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
+#                         lossD = criterionD(outputsD, targetD)
+#                         lossD.backward()
+#                         optimizerD.step()
 
-                        running_lossD += lossD.item()
+#                         running_lossD += lossD.item()
 
-                    # print(running_lossD/(iD+1))
+#                     # print(running_lossD/(iD+1))
 
-                latents, _ = modelF(images_noisy)
-                output = decoder(latents.view(latents.shape[0], -1).detach())
+#                 latents, _ = modelF(images_noisy)
+#                 output = decoder(latents.view(latents.shape[0], -1).detach())
 
             
                     
-        if (args.eval_save_sample_images) and not_saved_itr:
-            not_saved_itr = False
-            # helper_functions.generate_sample_images(gener.detach(), target, title='gener by '+args.method, param_dict={'epsilon':args.eval_epsilon, 'itr':itr}, args=args)
+#         if (args.eval_save_sample_images) and not_saved_itr:
+#             not_saved_itr = False
+#             helper_functions.generate_sample_images(gener.detach(), target, title='gener by %s autoencoder'%args.method, param_dict={'epsilon':args.eval_epsilon, 'itr':itr}, args=args)
 
-            # measure accuracy and record loss
-            losse = criterione(output, target) 
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            top1.update(acc1[0].item(), images.size(0))
+#         # measure accuracy and record loss
+#         losse = criterione(output, target) 
+#         acc1, acc5 = accuracy(output, target, topk=(1, 5))
+#         top1.update(acc1[0].item(), images.size(0))
 
-            # measure correlation and record loss
-            reference = F.interpolate(reference, size=gener.shape[-1])
-            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+#         # measure correlation and record loss
+#         reference = F.interpolate(reference, size=gener.shape[-1])
+#         lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
 
-            pcorr = correlation(gener, reference)
-            losses.update(lossd.item(), images.size(0))
-            corr.update(pcorr, images.size(0))
-                
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
+#         pcorr = correlation(gener, reference)
+#         losses.update(lossd.item(), images.size(0))
+#         corr.update(pcorr, images.size(0))
+            
+#         # measure elapsed time
+#         batch_time.update(time.time() - end)
+#         end = time.time()
 
-            if i % args.print_freq == 0:
-                progress.display(i)
-        # # measure accuracy and record loss
-        # losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
-        # acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        # top1.update(acc1[0].item(), images.size(0))
+#         if i % args.print_freq == 0:
+#             progress.display(i)
+#         # # measure accuracy and record loss
+#         # losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
+#         # acc1, acc5 = accuracy(output, target, topk=(1, 5))
+#         # top1.update(acc1[0].item(), images.size(0))
         
-        # reference = F.interpolate(reference, size=gener.shape[-1])
-        # lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
-        # # measure correlation and record loss
-        # pcorr = correlation(gener, reference)
-        # losses.update(lossd.item(), images.size(0))
-        # corr.update(pcorr, images.size(0))
+#         # reference = F.interpolate(reference, size=gener.shape[-1])
+#         # lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+#         # # measure correlation and record loss
+#         # pcorr = correlation(gener, reference)
+#         # losses.update(lossd.item(), images.size(0))
+#         # corr.update(pcorr, images.size(0))
 
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
+#         # measure elapsed time
+#         batch_time.update(time.time() - end)
+#         end = time.time()
 
-        if i % args.print_freq == 0:
-            progress.display(i)
+#         if i % args.print_freq == 0:
+#             progress.display(i)
 
 
-    print('Test avg {method} itr{itr} epsilon{epsilon} * lossd {losses.avg:.3f}'
-        .format(method=args.method, itr=itr, epsilon=args.eval_epsilon,losses=losses), flush=True)
+#     print('Test avg {method} itr{itr} epsilon{epsilon} * lossd {losses.avg:.3f}'
+#         .format(method=args.method, itr=itr, epsilon=args.eval_epsilon,losses=losses), flush=True)
 
-    # TODO: this should also be done with the ProgressMeter
-    print('Test avg  {method} itr{itr} epsilon{epsilon} * Acc@1 {top1.avg:.3f}'
-        .format(method=args.method, itr=itr, epsilon=args.eval_epsilon, top1=top1), flush=True)
+#     # TODO: this should also be done with the ProgressMeter
+#     print('Test avg  {method} itr{itr} epsilon{epsilon} * Acc@1 {top1.avg:.3f}'
+#         .format(method=args.method, itr=itr, epsilon=args.eval_epsilon, top1=top1), flush=True)
             
 
-    return modelF, modelB, [top1.avg, corr.avg, losses.avg]
+#     return modelF, modelB, [top1.avg, corr.avg, losses.avg]
 
 
 def generate_RDMs(val_loader, modelF, modelB, criterione, criteriond, args):
