@@ -111,6 +111,8 @@ parser.add_argument('--factore', '--factore-scheduler', default=0.1, type=float,
 parser.add_argument('--factord', '--factord-scheduler', default=0.1, type=float,
                     metavar='FacD', help='factor in scheduler decoder', dest='factord')
 
+parser.add_argument('--normalization_affine', default=True, type=bool,
+                     help='affine arg in batch normalization', dest='normalization_affine')
 
 parser.add_argument('--momentumF', default=0.9, type=float, metavar='MF',
                     help='momentum forward')
@@ -284,7 +286,7 @@ else:
 if 'FullyConnected' in args.arche:
     kwargs_asym = {'algorithm':'FA', 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
 else:
-    kwargs_asym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': True}
+    kwargs_asym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': args.normalization_affine}
 
 
 modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_asym)).cuda() #Forward().cuda() # main model
@@ -292,7 +294,7 @@ modelB = nn.parallel.DataParallel(getattr(custom_models, args.archd)(**kwargs_as
 if 'FullyConnected' in args.arche:
     kwargs_sym = {'algorithm':'BP', 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
 else:
-    kwargs_sym = {'algorithm':'BP', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': True}
+    kwargs_sym = {'algorithm':'BP', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': args.normalization_affine}
 
 modelC = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_sym)).cuda() # Forward Control model to compare to BP
 
