@@ -4,7 +4,7 @@
 #SBATCH -c 20
 #SBATCH --gres=gpu:2
 #SBATCH --mem=20gb
-#SBATCH --array=0-10
+#SBATCH --array=0-11
 #SBATCH --time=5-00:00:00
 #SBATCH -A issa
 
@@ -35,22 +35,22 @@ config=0
 
 
 
-#Fully Connected
-# python -u create_config.py  --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
-# python -u create_config.py  --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-3 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
-# python -u create_config.py  --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-3 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
-# python -u create_config.py  --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-3 --wdB 1e-3 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
+#Search grid
+# python -u create_config.py --hash hypersearch --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -dataset CIFAR10 -j16 --input_size 32 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B -p 100 --note  $note ; config=1 
+# python -u create_config.py --hash hypersearch --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-3 --wdB 1e-5 --patiencee 50 --patienced 40 -dataset CIFAR10 -j16 --input_size 32 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B -p 100 --note  $note ; config=1 
+# python -u create_config.py --hash hypersearch --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-3 --patiencee 50 --patienced 40 -dataset CIFAR10 -j16 --input_size 32 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B -p 100 --note  $note ; config=1 
+# python -u create_config.py --hash hypersearch --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-3 --wdB 1e-3 --patiencee 50 --patienced 40 -dataset CIFAR10 -j16 --input_size 32 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B -p 100 --note  $note ; config=1 
 
-# python -u create_config.py  --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-2 --lrB 1e-3 --wdF 1e-5 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
-# python -u create_config.py  --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-2 --lrB 1e-3 --wdF 1e-3 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
-# python -u create_config.py  --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-2 --lrB 1e-3 --wdF 1e-5 --wdB 1e-3 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
-# python -u create_config.py  --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-2 --lrB 1e-3 --wdF 1e-3 --wdB 1e-3 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
+# python -u create_config.py --hash hypersearch --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-2 --lrB 1e-3 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -dataset CIFAR10 -j16 --input_size 32 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B -p 100 --note  $note ; config=1 
+# python -u create_config.py --hash hypersearch --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-2 --lrB 1e-3 --wdF 1e-3 --wdB 1e-5 --patiencee 50 --patienced 40 -dataset CIFAR10 -j16 --input_size 32 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B -p 100 --note  $note ; config=1 
+# python -u create_config.py --hash hypersearch --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-2 --lrB 1e-3 --wdF 1e-5 --wdB 1e-3 --patiencee 50 --patienced 40 -dataset CIFAR10 -j16 --input_size 32 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B -p 100 --note  $note ; config=1 
+# python -u create_config.py --hash hypersearch --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-2 --lrB 1e-3 --wdF 1e-3 --wdB 1e-3 --patiencee 50 --patienced 40 -dataset CIFAR10 -j16 --input_size 32 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B -p 100 --note  $note ; config=1 
 
 
-# python -u create_config.py  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
-# python -u create_config.py  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-4 --wdF 1e-5 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
-# python -u create_config.py  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-5 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
-# python -u create_config.py  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-3 --wdF 1e-5 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset MNIST -j16 --input_size 32 --batch-size 256 --epoch 100 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
+# python -u create_config.py --hash hypersearch --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -dataset CIFar10 -j16 --input_size 32 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B -p 100 --note  $note ; config=1 
+# python -u create_config.py --hash hypersearch --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-4 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -dataset CIFar10 -j16 --input_size 32 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B -p 100 --note  $note ; config=1 
+# python -u create_config.py --hash hypersearch --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -dataset CIFar10 -j16 --input_size 32 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B -p 100 --note  $note ; config=1 
+# python -u create_config.py --hash hypersearch --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-3 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -dataset CIFar10 -j16 --input_size 32 --batch-size 256 --epoch 100 -ae AsymResLNet10F -ad AsymResLNet10B -p 100 --note  $note ; config=1 
 
 # Sep30-16-51_MNIST_4c4b77d125_618
 # Sep30-16-51_MNIST_4c4b77d125_715
@@ -62,7 +62,7 @@ if [ $config == 0 ]
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTAsymResLNet10.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTFullyConn.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpropRMSpropMNISTFullyConnE150.txt'
-    filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpRMSpMNISTAsymResLNet10BNaffine.txt'
+    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpRMSpMNISTAsymResLNet10BNaffine.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpRMSpMNISTAsymResLNet10BNaffine2.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpRMSpMNISTAsymResLNet10BNaff3.txt'
 
@@ -73,7 +73,9 @@ if [ $config == 0 ]
     
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/RMSpCIFAR10AsymResLNet10BNaff.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/MNISTAsymResLNet10BNaffPatience30.txt'
-    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/MNISTAsymResLNet10BNaffPatience30.txt'
+
+
+    filename='/home/tt2684/Research/Results/Symbio/runswithhash/hypersearch.txt'
 
     n=1
     runnames=()
@@ -84,6 +86,7 @@ if [ $config == 0 ]
     
     runname=$line #Sep30-14-41_MNIST_4c4b77d125_237 # Sep30-11-43_MNIST_4c4b77d125_516   #May25-09-00_CIFAR10_b784081472_181
     runnames+=( $runname )
+    # # When task id picks methods 
     # configpath="/home/tahereh/Documents/Research/Results/Symbio/Symbio/$runname/configs.yml"
     # configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
     # methods=('SLVanilla' 'BP' 'FA') # ('SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
@@ -91,25 +94,25 @@ if [ $config == 0 ]
     # python -u main_train.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
     done < $filename
 
-
+    ## when task id picks a runname
     method=BP
 
     configpath="/home/tt2684/Research/Results/Symbio/Symbio/${runnames[$SLURM_ARRAY_TASK_ID]}/configs.yml"
     printf " Here $configpath \n"
-    # python -u main_train.py --method $method  --config-file $configpath # --resume_training_epochs 400
+    python -u main_train.py --method $method  --config-file $configpath # --resume_training_epochs 400
     # python -u main_train_autoencoders.py --method $method  --config-file $configpath
 
     
 
-    # robustness to noise evaluation
-    for eval_sigma2 in `seq 1e-3 0.1 1.0` # why start at 1e-3 instead of zero? becuase numpy. doesn't accept zero as sigma2 
-    do
-    eval_epsilon=0.0
-    # python -u main_evaluate.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
-    python -u main_evaluate_autoencoders.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
-    # python -u main_evaluate_dynamic_decoder.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+    # # robustness to noise evaluation
+    # for eval_sigma2 in `seq 1e-3 0.1 1.0` # why start at 1e-3 instead of zero? becuase numpy. doesn't accept zero as sigma2 
+    # do
+    # eval_epsilon=0.0
+    # # python -u main_evaluate.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+    # python -u main_evaluate_autoencoders.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+    # # python -u main_evaluate_dynamic_decoder.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
 
-    done
+    # done
 
     
     # # robustness to adversarial attacks evaluation

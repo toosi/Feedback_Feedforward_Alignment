@@ -80,7 +80,7 @@ parser.add_argument('--method', type=str, default='BP', metavar='M',
                     help='method:BP|SLVanilla|SLBP|FA|SLTemplateGenerator')
 
 parser.add_argument('--resume_training_epochs', type=int, default=0,
-                    help='if greater than 0 reads the checkpoint from rusultsdir and append results to jsons and csvs')
+                    help='if greater than 0 reads the checkpoint from resultsdir and append results to jsons and csvs')
 parser.add_argument('--epochs', default=300, type=int, metavar='N',
                     help='number of total epochs to run')
 args = parser.parse_args()
@@ -284,7 +284,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if 'FullyConnected' in args.arche:
         kwargs_asym = {'algorithm':args.algorithm, 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
     else:
-        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': True}
+        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': args.normalization_affine}
 
     print(kwargs_asym)
     modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_asym)).cuda() #Forward().cuda() # main model
