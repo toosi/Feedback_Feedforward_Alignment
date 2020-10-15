@@ -12,3 +12,13 @@ We have two types of control autoencoders:
 reconstrucntion
     * Training: main_train_autoencoders_twocosts.py
     * Evaluation: main_evaluate_autoencoders_twocosts.py  
+
+
+### Things to remember:
+After running the autoencoder with two cost functions:
+    * In the main_train there was a second optimizer.step() that I removed after
+    subission to NeurIPS' workshop.
+
+## SL + BiHebb using PCGrad
+
+In *main_train_PCGrad* I force modelF and modelB to tolerate each other's gradient usnig PCGrad.  
