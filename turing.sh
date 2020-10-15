@@ -25,13 +25,13 @@ config=0
 
 
 
-python -u create_config.py  -dataset STL10 --normalization_affine False -j 24 --input_size 96 --base_channels 64 --batch-size 64 --epoch 400 -ae AsymResLNet14F -ad AsymResLNet14B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 30 --patienced 20 -p 100 --note  $note ; config=1  #
+# python -u create_config.py  -dataset STL10    -j 24 --input_size 96 --base_channels 64 --batch-size 64 --epoch 400 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 30 --patienced 20 -p 100 --note  $note ; config=1  #
 
 
 
 if [ $config == 0 ]
   then
-    runname=Oct14-12-04_STL10_1f4e9791fd_753
+    runname=Oct14-12-49_STL10_43b6e67b0a_905
     #Oct10-11-44_MNIST_3a134f421d_RMSpRMSpMNISTAsymResLNet10BNaff3_251 # Sep30-11-43_MNIST_4c4b77d125_516   #May25-09-00_CIFAR10_b784081472_181
     configpath="/home/tahereh/Documents/Research/Results/Symbio/Symbio/$runname/configs.yml"
 
