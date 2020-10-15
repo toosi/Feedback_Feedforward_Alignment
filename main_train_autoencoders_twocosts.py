@@ -79,21 +79,15 @@ parser.add_argument(
 parser.add_argument('--method', type=str, default='BP', metavar='M',
                     help='method:BP|SLVanilla|SLBP|FA|SLTemplateGenerator')
 
-parser.add_argument('--resume_training_epochs', type=int, default=0,
-                    help='if greater than 0 reads the checkpoint from resultsdir and append results to jsons and csvs')
-parser.add_argument('--epochs', default=300, type=int, metavar='N',
-                    help='number of total epochs to run')
+
 args = parser.parse_args()
 assert args.config_file, 'Please specify a config file path'
 if args.config_file:
     data = yaml.load(args.config_file)
     delattr(args, 'config_file')
-    delattr(args, 'epochs')
     arg_dict = args.__dict__
     for key, value in data.items():
         setattr(args, key, value)
-    if args.resume_training_epochs:
-        args.epochs = args.resume_training_epochs
 
 pp.pprint(arg_dict)
 print(args.method)
@@ -209,13 +203,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
         train_mean = (0.5070751592371323, 0.48654887331495095, 0.4409178433670343)
         train_std = (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
-    
-    if args.dataset == 'STL10':
-        args.n_classes = 10
-        input_size = 96
-        image_channels = 3
-        train_mean = (0.4313, 0.4156, 0.3663)
-        train_std = (0.2683, 0.2610, 0.2687)
 
         
     elif 'MNIST' in args.dataset:
@@ -291,7 +278,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if 'FullyConnected' in args.arche:
         kwargs_asym = {'algorithm':args.algorithm, 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
     else:
-        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': not(args.normalization_noaffine)}
+        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': True}
 
     print(kwargs_asym)
     modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_asym)).cuda() #Forward().cuda() # main model
@@ -337,33 +324,24 @@ def main_worker(gpu, ngpus_per_node, args):
         # dict_params_middleF = {'params':[p for n,p in list(modelF.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
         # list_paramsF = [dict_params_firstF, dict_params_middleF, dict_params_lastF]
         # list_paramsF = [p for p in list(modelF.parameters()) if p.requires_grad==True]
+        # list_paramsAuto = [p for n,p in list(modelF.named_parameters())  if 'feedback' not in n] + \
+        # [p for n,p in list(modelB.named_parameters())  if 'feedback' not in n]
         list_paramsF = [p for n,p in list(modelF.named_parameters()) if 'feedback' not in n]
-        list_paramsFB_local = [p for n,p in list(modelF.named_parameters()) if 'feedback' in n]
 
-        # dict_params_firstB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-3}
-        # dict_params_lastB = {'params':[p for n,p in list(modelB.named_parameters()) if n in ['module.downsample2.weight']], 'weight_decay':1e-3}
-        # dict_params_middleB = {'params':[p for n,p in list(modelB.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
-        # list_paramsB = [dict_params_firstB, dict_params_middleB, dict_params_lastB]
-        # list_paramsB = [p for p in list(modelB.parameters()) if p.requires_grad==True]
+
         list_paramsB = [p for n,p in list(modelB.named_parameters()) if 'feedback' not in n]
 
-        optimizerFB_local = torch.optim.Adam(list_paramsFB_local, lr=0.0097)
 
         if 'Adam' in args.optimizerF:
 
             optimizerF = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
                         weight_decay=args.wdF)
-            optimizerF3 = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
-                        weight_decay=args.wdF)
+
         else:
             
             optimizerF = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
                                     momentum=args.momentumF,
                                     weight_decay=args.wdF,)
-            optimizerF3 = getattr(torch.optim,args.optimizerF)(list_paramsF, args.lrF,
-                        momentum=args.momentumF,
-                        weight_decay=args.wdF)
-
         if 'Adam' in args.optimizerB:                       
 
             optimizerB = getattr(torch.optim,args.optimizerB)(list_paramsB, args.lrB,
@@ -374,62 +352,22 @@ def main_worker(gpu, ngpus_per_node, args):
                                 momentum=args.momentumB,
                                 weight_decay=args.wdB)
     
-    schedulerF = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerF, 'max', patience=args.patiencee, factor=args.factore)
+
+
+    # scheduler for autoenoder has to go for 'min' instead of max, becuase this time it's a reconstruction cost
+    schedulerF = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerF, 'min', patience=args.patiencee, factor=args.factore)
     schedulerB = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerB, 'max', patience=args.patienced, factor=args.factord)
 
-    schedulerF3 = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerF3, 'max', patience=args.patiencee, factor=args.factore)
 
     
     modelF_nottrained = torch.load(args.resultsdir+'model%s_untrained.pt'%modelidentifier)
     modelB_nottrained = torch.load(args.resultsdir+'modelB_untrained.pt')
 
-    optimizerF_original = torch.load(args.resultsdir+'optimizer%s_original.pt'%modelidentifier)
-    optimizerB_original = torch.load(args.resultsdir+'optimizerB_original.pt')
 
-    schedulerF_original = torch.load(args.resultsdir+'scheduler%s_original.pt'%modelidentifier)
-    schedulerB_original = torch.load(args.resultsdir+'schedulerB_original.pt')
+    modelF.load_state_dict(modelF_nottrained)
+    modelB.load_state_dict(modelB_nottrained)
 
-    if args.resume_training_epochs == 0:
-        modelF.load_state_dict(modelF_nottrained)
-        optimizerF.load_state_dict(optimizerF_original)        
-        optimizerF3.load_state_dict(optimizerF_original)
-        schedulerF.load_state_dict(schedulerF_original)
-        schedulerF3.load_state_dict(schedulerF_original)
-        
-    else:
-        checkpointe = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)
-        modelF_trained = checkpointe['state_dict']
-        args.start_epoch = checkpointe['epoch']
-
-        best_acce = checkpointe['best_loss']
-        if args.gpu is not None:
-            # best_loss may be from a checkpoint from a different GPU
-            best_acce = best_acce.to(args.gpu)
-        modelF.load_state_dict(checkpointe['state_dict'])
-        optimizerF.load_state_dict(checkpointe['optimizer'])
-
-        if 'scheduler' in checkpointe.keys():
-            schedulerF.load_state_dict(checkpointe['scheduler'])
-        else:
-            schedulerF.load_state_dict(schedulerF_original)
-
-    if args.resume_training_epochs == 0 or args.method in ['FA','BP']:  
-        modelB.load_state_dict(modelB_nottrained)   
-        optimizerB.load_state_dict(optimizerB_original) 
-        schedulerB.load_state_dict(schedulerB_original)
-
-    else:
-        checkpointd = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)
-        modelB_trained = checkpointd['state_dict']
-        optimizerB.load_state_dict(checkpointd['optimizer'])
-
-        if 'scheduler' in checkpointd.keys():
-            schedulerB.load_state_dict(checkpointd['scheduler'])
-        else:
-            schedulerB.load_state_dict(schedulerB_original)
-
-
-
+    
     
     # Data loading code
     if args.dataset == 'imagenet':
@@ -495,33 +433,6 @@ def main_worker(gpu, ngpus_per_node, args):
         test_dataset = getattr(datasets, args.dataset)(root=args.imagesetdir, train=False, download=True, transform=transform_test)
         val_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, drop_last=True)
 
-    elif 'STL' in args.dataset:
-
-        transform_train = transforms.Compose([
-        transforms.RandomResizedCrop(input_size),
-        transforms.RandomHorizontalFlip(p=0.5),
-        transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
-        transforms.RandomGrayscale(p=0.2),
-        transforms.ToTensor(),
-        transforms.Normalize(train_mean, train_std),
-        ])
-
-        transform_test = transforms.Compose([
-            transforms.RandomResizedCrop(input_size),
-            transforms.ToTensor(),
-            transforms.Normalize(train_mean, train_std),
-        ])
-
-        train_dataset = getattr(datasets, args.dataset)(root=args.imagesetdir, split='train', download=True, transform=transform_train)
-        if args.distributed:
-            train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-        else:
-            train_sampler = None
-        
-        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,sampler=train_sampler, shuffle=(train_sampler is None), num_workers=args.workers, drop_last=True)
-
-        test_dataset = getattr(datasets, args.dataset)(root=args.imagesetdir, split='test', download=True, transform=transform_test)
-        val_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, drop_last=True)
 
         
     
@@ -562,7 +473,6 @@ def main_worker(gpu, ngpus_per_node, args):
                 # best_loss may be from a checkpoint from a different GPU
                 best_acce = best_acce.to(args.gpu)
             modelF.load_state_dict(checkpointe['state_dict'])
-            optimizerF.load_state_dict(checkpointe['optimizer'])
 
             checkpointd = torch.load(args.resume+'checkpointd.pth.tar')
             args.start_epoch = checkpointd['epoch']
@@ -571,7 +481,6 @@ def main_worker(gpu, ngpus_per_node, args):
                 # best_loss may be from a checkpoint from a different GPU
                best_lossd = best_lossd.to(args.gpu)
             modelB.load_state_dict(checkpointd['state_dict'])
-            optimizerB.load_state_dict(checkpointd['optimizer'])
 
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpointe['epoch']))
@@ -587,7 +496,6 @@ def main_worker(gpu, ngpus_per_node, args):
                 # best_loss may be from a checkpoint from a different GPU
                 best_acce = best_acce.to(args.gpu)
             modelFFA.load_state_dict(checkpointeFA['state_dict'])
-            optimizerFFA.load_state_dict(checkpointeFA['optimizer'])
 
 
             print("=> loaded checkpoint FA'{}' (epoch {})"
@@ -604,7 +512,6 @@ def main_worker(gpu, ngpus_per_node, args):
                 # best_loss may be from a checkpoint from a different GPU
                 best_acce = best_acce.to(args.gpu)
             modelFBP.load_state_dict(checkpointeBP['state_dict'])
-            optimizerFBP.load_state_dict(checkpointeBP['optimizer'])
 
 
             print("=> loaded checkpoint BP'{}' (epoch {})"
@@ -645,7 +552,7 @@ def main_worker(gpu, ngpus_per_node, args):
     Alignments_ratios_last_layer_list =  []
 
     results = {'train_acc': [],  'test_acc': [], 'train_lossd': [],  'test_lossd': [], 'train_corrd': [],  'test_corrd': []}
-    for epoch in np.arange(args.start_epoch, args.epochs):
+    for epoch in range(args.start_epoch, args.epochs):
 
         if args.distributed:
             train_sampler.set_epoch(epoch)
@@ -656,13 +563,14 @@ def main_worker(gpu, ngpus_per_node, args):
         run_json_dict.update({'lrF':lrF_list})
 
         print('*****  lrF=%1e'%(lrF))
+
+        assert args.method in ['BP','FA']
         
         # train for one epoch
-        modelF, modelB, train_results = train(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB,optimizerF3, schedulerF,schedulerB,schedulerF3, optimizerFB_local, epoch, args)
-        Train_acce_list.extend( [round(train_results[0],3)])
+        modelF, modelB, train_results = train(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB, schedulerF, epoch, args)
+        Train_acce_list.extend([round(train_results[0],3)])
         Train_corrd_list.extend([round(train_results[1],3)])
         Train_lossd_list.extend([train_results[2]])
-        Train_lossl_list.extend([train_results[3]])
 
         results['train_acc'].append(round(train_results[0],3))
         results['train_corrd'].append(train_results[1])
@@ -671,10 +579,9 @@ def main_worker(gpu, ngpus_per_node, args):
         run_json_dict.update({'Train_acce':Train_acce_list})
         run_json_dict.update({'Train_corrd':Train_corrd_list})
         run_json_dict.update({'Train_lossd':Train_lossd_list})
-        run_json_dict.update({'Train_lossl':Train_lossl_list})
 
         # evaluate on validation set
-        _, _, test_results = validate(val_loader, modelF,modelB, criterione, criteriond, args, epoch)
+        _, _, test_results = validate(val_loader,train_loader, modelF,modelB, criterione, criteriond, args, epoch)
         
         results['test_acc'].append(round(test_results[0],3))
         results['test_lossd'].append(test_results[2])
@@ -685,42 +592,45 @@ def main_worker(gpu, ngpus_per_node, args):
         Test_acce_list.extend( [round(test_results[0],3)])
         Test_corrd_list.extend([round(test_results[1],3)])
         Test_lossd_list.extend([test_results[2]])
-        Test_lossl_list.extend([test_results[3]])
 
         run_json_dict.update({'Test_acce':Test_acce_list})
         run_json_dict.update({'Test_corrd':Test_corrd_list})
         run_json_dict.update({'Test_lossd':Test_lossd_list})
-        run_json_dict.update({'Test_lossl':Test_lossl_list})
 
         # save statistics
-        if args.resume_training_epochs:
-            df = pd.read_csv(args.resultsdir + 'training_results_%s.csv'%args.algorithm)
-
-            for k in results.keys():
-                if k != 'Unnamed: 0':
-                    
-                    new_item =  list(df[k]) + results[k]
-                    results.update({k: new_item})
-
         data_frame = pd.DataFrame(data=results)
-        data_frame.to_csv(args.resultsdir + 'training_results_%s.csv'%args.algorithm)
+        data_frame.to_csv(args.resultsdir + 'training_results_autoencoders_%s.csv'%args.algorithm)
 
         # evaluate alignments
         list_WF = [k for k in modelF.state_dict().keys() if 'feedback' in k]
+        list_WB = [k for k in modelB.state_dict().keys() if 'feedback' in k]
+
         first_layer_key = list_WF[0]
         last_layer_key = list_WF[-1]
 
-        corrs_first_layer = correlation(modelF.state_dict()[first_layer_key.strip('_feedback')], modelF.state_dict()[first_layer_key])
-        ratios_first_layer = torch.norm(modelF.state_dict()[first_layer_key.strip('_feedback')]).item()/torch.norm(modelF.state_dict()[first_layer_key]).item() 
+        if 'FullyConn' in args.arche:
+            # TODO in the naive implementation of fully connected, fc-0 in modelB corresponds to fc-2 in modelF, fixed it
+            first_layer_keyB = list_WB[-1]
+            last_layer_keyB = list_WB[0]
+        else:
+            first_layer_keyB = first_layer_key
+            last_layer_keyB = copy.deepcopy(last_layer_key)
 
-        corrs_last_layer = correlation(modelF.state_dict()[last_layer_key.strip('_feedback')], modelF.state_dict()[last_layer_key])
-        ratios_last_layer = torch.norm(modelF.state_dict()[last_layer_key.strip('_feedback')]).item()/torch.norm(modelF.state_dict()[last_layer_key]).item() 
+        if 'downsample' in last_layer_key:
+            last_layer_keyB = last_layer_keyB.replace('down', 'up').strip('_feedback')
 
-        norm_first_layer = torch.norm(modelF.state_dict()[first_layer_key.strip('_feedback')]).item()
-        norm_last_layer = torch.norm(modelF.state_dict()[first_layer_key.strip('_feedback')]).item()
+        # here for autoencoders I replaced modelF with modelB because we don't toggle weights here
+        corrs_first_layer = correlation(modelF.state_dict()[first_layer_key.strip('_feedback')], modelB.state_dict()[first_layer_keyB])
+        ratios_first_layer = torch.norm(modelF.state_dict()[first_layer_key.strip('_feedback')]).item()/torch.norm(modelB.state_dict()[first_layer_keyB]).item() 
 
-        norm_first_layer_back = torch.norm(modelF.state_dict()[first_layer_key]).item()
-        norm_last_layer_back = torch.norm(modelF.state_dict()[first_layer_key]).item()
+        corrs_last_layer = correlation(modelF.state_dict()[last_layer_key.strip('_feedback')], modelB.state_dict()[last_layer_keyB])
+        ratios_last_layer = torch.norm(modelF.state_dict()[last_layer_key.strip('_feedback')]).item()/torch.norm(modelB.state_dict()[last_layer_keyB]).item() 
+
+        norm_first_layer = torch.norm(modelB.state_dict()[first_layer_key.strip('_feedback')]).item()
+        norm_last_layer = torch.norm(modelB.state_dict()[last_layer_keyB]).item()
+
+        norm_first_layer_back = torch.norm(modelB.state_dict()[first_layer_keyB]).item()
+        norm_last_layer_back = torch.norm(modelB.state_dict()[last_layer_keyB]).item()
 
 
         Alignments_corrs_first_layer_list.extend([round(corrs_first_layer, 3)])
@@ -747,7 +657,6 @@ def main_worker(gpu, ngpus_per_node, args):
         # ---- adjust learning rates ----------
 
         adjust_learning_rate(schedulerF, acce)
-        adjust_learning_rate(schedulerB, acce)# corrd
 
         # adjust_learning_rate(schedulerF3, acce)
 
@@ -755,9 +664,7 @@ def main_worker(gpu, ngpus_per_node, args):
         is_beste = acce > best_acce
         best_acce = max(acce, best_acce)
     
-        if args.method == 'BSL':
-            break
-
+        
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
 
@@ -767,137 +674,29 @@ def main_worker(gpu, ngpus_per_node, args):
                 'state_dict': modelF.state_dict(),
                 'best_loss': best_acce,
                 'optimizer' : optimizerF.state_dict(),
-                'scheduler' : schedulerF.state_dict(),
-            }, is_beste, filename='checkpointe_%s.pth.tar'%args.method)
+            }, is_beste, filename='checkpointe_autoencoder_TwoCosts_%s.pth.tar'%args.method)
 
-            if args.method.startswith('SL') or args.method == 'BSL':
-                save_checkpoint({
-                    'epoch': epoch + 1,
-                    'arch': args.archd,
-                    'state_dict': modelB.state_dict(),
-                    'best_loss': best_acce,
-                    'optimizer' : optimizerB.state_dict(),
-                    'scheduler' : schedulerB.state_dict(),
-                }, is_beste,  filename='checkpointd_%s.pth.tar'%args.method)
+            save_checkpoint({
+                'epoch': epoch + 1,
+                'arch': args.arche,
+                'state_dict': modelB.state_dict(),
+                'best_loss': best_acce,
+                'optimizer' : optimizerB.state_dict(),
+            }, is_beste, filename='checkpointd_autoencoder_TwoCosts_%s.pth.tar'%args.method)
+        
             
-            if args.resume_training_epochs:
-                with open('%srun_json_dict_%s.json'%(args.resultsdir, args.method), 'r') as fp:
-                    chkp_run_json_dict = json.load(fp)
-                for k in chkp_run_json_dict.keys():
-                    new_item = chkp_run_json_dict[k] + run_json_dict[k]
-                    run_json_dict.update({k:new_item})
-
-            with open('%srun_json_dict_%s.json'%(args.resultsdir, args.method), 'w') as fp:
+            with open('%s/run_json_dict_autoencoder_%s.json'%(args.resultsdir, args.method), 'w') as fp:
                 
                 json.dump(run_json_dict, fp, indent=4, sort_keys=True)        
                 fp.write("\n")
 
-    if args.method == 'BSL':
-        # a json to keep the records
-        run_json_dict = {}
-        Train_acce_list = []
-        Train_corrd_list = []
-        Train_lossd_list= []
-
-        Test_acce_list  = []
-        Test_corrd_list = []
-        Test_lossd_list = []
-
-        lrF_list = []
-
-
-        if 'AsymResLNet' in args.arche:
-            modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))
-        elif 'asymresnet' in args.arche:
-            modelB.load_state_dict(modelF.state_dict(), toggle_state_dict(modelB.state_dict()))
         
-
-        for epoch in range(args.start_epoch, args.epochs):
-
-            if args.distributed:
-            
-                train_sampler.set_epoch(epoch)
-
-        
-            for param_group in optimizerF.param_groups:
-                lrF = param_group['lr'] 
-            lrF_list.extend([lrF])
-            run_json_dict.update({'lrF':lrF_list})
-
-
-            print('*****  lrF=%1e'%(lrF))
-            
-            # train for one epoch
-            modelF, modelB, train_results = train(train_loader, modelF, modelB, criterione, criteriond, optimizerF, optimizerB,optimizerF3, schedulerF,schedulerB,schedulerF3, epoch, args)
-            Train_acce_list.extend( [round(train_results[0],3)])
-            Train_corrd_list.extend([round(train_results[1],3)])
-            Train_lossd_list.extend([train_results[2]])
-            run_json_dict.update({'Train_acce':Train_acce_list})
-            run_json_dict.update({'Train_corrd':Train_corrd_list})
-            run_json_dict.update({'Train_lossd':Train_lossd_list})
-            # evaluate on validation set
-            _, _, test_results = validate(val_loader, modelF,modelB, criterione, criteriond, args, epoch)
-            
-            acce = test_results[0]
-            corrd = test_results[1]
-            Test_acce_list.extend( [round(test_results[0],3)])
-            Test_corrd_list.extend([round(test_results[1],3)])
-            Test_lossd_list.extend([test_results[2]])
-            run_json_dict.update({'Test_acce':Test_acce_list})
-            run_json_dict.update({'Test_corrd':Test_corrd_list})
-            run_json_dict.update({'Test_lossd':Test_lossd_list})
-
-            # ---- adjust learning rates ----------
-
-            adjust_learning_rate(schedulerF, acce)
-            adjust_learning_rate(schedulerB, corrd)#acce
-
-
-            # remember best acc@1 and save checkpoint
-            is_beste = acce > best_acce
-            best_acce = max(acce, best_acce)
-
-            if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                    and args.rank % ngpus_per_node == 0):
-
-                save_checkpoint({
-                    'epoch': epoch + 1,
-                    'arch': args.arche,
-                    'state_dict': modelF.state_dict(),
-                    'best_loss': best_acce,
-                    'optimizer' : optimizerF.state_dict(),
-                    'scheduler' : schedulerF.state_dict(),
-                }, is_beste, filename='checkpointe_%s.pth.tar'%args.method)
-
-                if args.method.startswith('SL') or args.method == 'BSL':
-                    save_checkpoint({
-                        'epoch': epoch + 1,
-                        'arch': args.archd,
-                        'state_dict': modelB.state_dict(),
-                        'best_loss': best_acce,
-                        'optimizer' : optimizerB.state_dict(),
-                        'scheduler' : schedulerB.state_dict(),
-                    }, is_beste,  filename='checkpointd_%s.pth.tar'%args.method)
-                
-                
-                if args.resume_training_epochs:
-                    with open('%srun_json_dict_%s.json'%(args.resultsdir, args.method), 'r') as fp:
-                        chkp_run_json_dict = json.load(fp)
-                    for k in chkp_run_json_dict.keys():
-                        new_item = chkp_run_json_dict[k] + run_json_dict[k]
-                        run_json_dict.update({k:new_item})
-
-                with open('%srun_json_dict_%s.json'%(args.resultsdir, args.method), 'w') as fp:
-                    
-                    json.dump(run_json_dict, fp, indent=4, sort_keys=True)        
-                    fp.write("\n")
-
 
 
 
 
         
-def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, optimizerB,optimizerF3,schedulerF,schedulerB,schedulerF3, optimizerFB_local, epoch, args):
+def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, optimizerB, schedulerF, epoch, args):
 
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
@@ -947,294 +746,68 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         modelF.train()
            
         # compute output
-        latents, output = modelF(images)
-        losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
+        # latents, output = modelF(images)
+        # losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
 
-        # compute gradient and do SGD step
-        optimizerF.zero_grad()
+        # # compute gradient and do SGD step
+        # optimizerF.zero_grad()
         
+        # losse.backward()
+        # optimizerF.step()
+
+        # optimizerFB_local.zero_grad()
+        optimizerF.zero_grad()
+        latents, output = modelF(images)
+        losse = criterione(output, target)
         losse.backward()
         optimizerF.step()
 
-        # # optimizerFB_local.zero_grad()
-        # optimizerF.zero_grad()
-        # latents, output = modelF(images)
-        # losse = criterione(output, target)
-        # losse.backward()
-        # # optimizerFB_local.step()
-        # optimizerF.step()
+        _, recons = modelB(latents.detach())
 
+         
+        gener = recons
+        reference = images
+        reference = F.interpolate(reference, size=gener.shape[-1])
 
-        if args.method == 'BP':
-            modelF.load_state_dict(toggle_state_dict_YYtoBP(modelF.state_dict(), modelF.state_dict()))
+        lossd = criteriond(gener, reference) #
+
+        optimizerB.zero_grad()
+        lossd.backward()
+        optimizerB.step()
 
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
         top1.update(acc1[0].item(), images.size(0))
 
-        if args.method not in ['BSL']:
-            # modelB.load_state_dict(toggle_state_dict(modelF.state_dict(), modelB.state_dict()))
-            
-            if 'AsymResLNet' in args.arche:
-                modelB.load_state_dict(toggle_state_dict(modelF.state_dict()))
-            elif 'asymresnet' in args.arche:
-                modelB.load_state_dict(toggle_state_dict(modelF.state_dict(), modelB.state_dict()))
-
-
-        if any(m in args.method for m in ['FA','BP', 'BSL']):
-            if args.arche.startswith('resnet18c'):
-                recons = images # Diabled modelB
-            else:
-                _, recons = modelB(latents.detach())
-            
-            gener = recons
-            reference = images
-            reference = F.interpolate(reference, size=gener.shape[-1])
-
-            # gamma = 10e-4
-            if args.lossfuncB == 'TripletMarginLoss':
-
-                shuffled_batch = reference[torch.randperm(reference.shape[0])]
-                lossd = criteriond(gener, reference, shuffled_batch)
-            else:
-                lossd = criteriond(gener, reference) #+ args.gamma * nn.MSELoss()(gener,torch.zeros_like(gener)) #+ criterione(modelF(pooled), target)
-
-            # measure correlation and record loss
-            pcorr = correlation(gener, reference)
-            losses.update(lossd.item(), images.size(0))
-            corr.update(pcorr, images.size(0))
-                
-
-        elif args.method.startswith('SL'):
-            # ----- decoder ------------------    
-            modelF.eval()
-            latents,  output = modelF(images)
-            modelF.train()
-
-            # switch to train mode
-            modelB.train()
-            _,recons = modelB(latents.detach()) 
-
-            if 'SLVanilla' in args.method:
-                gener = recons
-                reference = images
-
-            elif 'SLTemplateGenerator' in args.method:
-                repb = onehot.detach()#modelB(onehot.detach())            
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                                              
-                _,targetproj = modelB(repb) #, switches
-
-                inputs_avgcat = torch.zeros_like(images)
-                for t in torch.unique(target):
-                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
-            
-                gener = targetproj
-                reference = inputs_avgcat
-  
-            
-            elif 'SLError' in args.method:
-                #TODO: check the norm of subtracts
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob
-
-                repb = torch.norm(output)*repb/torch.norm(repb)
-
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _, gener = modelB(repb.detach())
-                reference = images - F.interpolate(recons, size=images.shape[-1])
-
-            elif 'SLRobust' in args.method:
-                
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob
-
-                repb = torch.norm(output)*repb/torch.norm(repb)
-
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _,gener = modelB(repb.detach())
-                reference = images 
-
-            elif 'SLErrorTemplateGenerator' in args.method:
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob#modelB(onehot.detach())       
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)                   
-                _,targetproj = modelB(repb) #, switches
-
-                inputs_avgcat = torch.zeros_like(images)
-                for t in torch.unique(target):
-                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
-            
-                gener = targetproj
-                reference = inputs_avgcat
-            
-            elif 'SLAdvImg' in args.method:
-
-                images.requires_grad = True
-                _, output = modelF(images)
-                losse = criterione(output, target)
-                modelF.zero_grad()
-                losse.backward()
-                images_grad = images.grad.data
-
-                train_epsilon=0.2
-                perturbed_images = fgsm_attack(images, train_epsilon, images_grad)
-                
-                gener = recons
-                reference = perturbed_images
-
-                images.requires_grad = False
-        
-            elif  'SLAdvCost' in args.method:
-
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob
-
-                repb = torch.norm(output)*repb/torch.norm(repb)
-
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _,gener = modelB(repb.detach())
-                reference = images 
-
-                _, output_gener = modelF(F.interpolate(gener, size=images.shape[-1]))
-            
-            elif 'SLGrConv1' in args.method:
-                # !!! requires to be run on a single gpu because of hooks !!!
-                hookF = Hook(list(modelF.module._modules.items())[0][1])
-                latent, output = modelF(images)
-                conv1 = hookF.output.detach()
-
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob
-
-                repb = torch.norm(output)*repb/torch.norm(repb)
-
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                preconv1,_ = modelB(repb.detach())
-
-                
-                gener = preconv1
-                reference = conv1
-            
-            elif 'SLConv1' in args.method:
-                # !!!  requires to be run on a single gpu because of hooks  !!! 
-                hookF = Hook(list(modelF.module._modules.items())[0][1])
-                latent, output = modelF(images)
-                conv1 = hookF.output.detach()
-                preconv1, _ = modelB(latent.detach())
-                gener = preconv1
-                reference = conv1
-            
-            elif 'SLLatentRobust' in args.method:
-                sigma2 = 0.2
-
-                latents, _ = modelF(images)
-                delta = torch.empty_like(latents).normal_(mean=0, std=np.sqrt(sigma2)).cuda()
-                _,gener = modelB(latents.detach() + delta)
-                reference = images
-                
-     
-
-            reference = F.interpolate(reference, size=gener.shape[-1])
-
-            if  'SLAdvCost' in args.method:
-                lossd = criteriond(gener, reference)-criterione(output_gener,target) #+ criterione(modelF(pooled), target)
-            else:
-                if args.lossfuncB == 'TripletMarginLoss':
-                
-                    shuffled_batch = reference[torch.randperm(reference.shape[0])]
-                    lossd = criteriond(gener, reference, shuffled_batch)
-                else:
-                    lossd = criteriond(gener, reference) #
-
-            # measure correlation and record loss
-            pcorr = correlation(gener, reference)
-            losses.update(lossd.item(), images.size(0))
-            corr.update(pcorr, images.size(0))
-                
-            # ## HERE! ATT!
-            # if epoch > 100 :
-            # compute gradient and do SGD step
-            optimizerB.zero_grad()
-            lossd.backward()
-            optimizerB.step()
-            #schedulerB.step()
-
-            # for resnets:
-            # modelF.load_state_dict(toggle_state_dict(modelB.state_dict(), modelF.state_dict()))
-            # modelF.load_state_dict(toggle_state_dict(modelB.state_dict()))#, modelF.state_dict()))
-            if 'AsymResLNet' in args.arche:
-                modelF.load_state_dict(toggle_state_dict(modelB.state_dict()))
-            elif 'asymresnet' in args.arche:
-                modelF.load_state_dict(toggle_state_dict(modelB.state_dict(),modelF.state_dict()))
-
-        #TODO: train recons error for BP and FA
+        # measure correlation and record loss
+        pcorr = correlation(gener, reference)
+        losses.update(lossd.item(), images.size(0))
+        corr.update(pcorr, images.size(0))
 
         
-        if args.method.endswith('CC0'):
-            latents, _ = modelF(images)
-            _,recons = modelB(latents.detach())
-            latents_gener, output_gener = modelF(F.interpolate(recons, size=images.shape[-1]).detach())
-            lossCC = criteriond(latents_gener, latents.detach())
-            # optimizerF3.zero_grad()
-            optimizerF.zero_grad()
-            lossCC.backward()
-            # optimizerF3.step()
-            optimizerF.step()
-
-        elif args.method.endswith('CC1'):
-            sigma2 = 0.2
-            latents, _ = modelF(images)
-            delta = torch.empty_like(latents).normal_(mean=0, std=np.sqrt(sigma2)).cuda()
-            _,gener = modelB(latents.detach() + delta)
-
-            latents_gener, output_gener = modelF(F.interpolate(gener, size=images.shape[-1]).detach())
-            lossCC = criteriond(latents_gener-latents.detach(), delta)
-            # optimizerF3.zero_grad()
-            optimizerF.zero_grad()
-            lossCC.backward()
-            # optimizerF3.step()
-            optimizerF.step()
-
-        latents, _ = modelF(images)
-
-        if args.arche.startswith('resnet18c'):
-            recons = images # Diabled modelB
-        else:
-            _, recons = modelB(latents.detach())
-
-      
-        lossL = torch.tensor([0]) 
-        losslatent.update(lossL.item(), images.size(0))
-
-        # # compute the accuracy after all training magics    
-        # _, output = modelF(images)
-        # acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        # top1.update(acc1[0].item(), images.size(0))
-
-
-        # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
 
         if i % args.print_freq == 0:
             progress.display(i)
 
-    print(args.method + ': Train avg  * lossd {losses.avg:.3f}'
+        
+
+    print(args.method + ': AutoencoderTwoCosts Train avg  * lossd {losses.avg:.3f}'
     .format(losses=losses), flush=True)
 
-    print(args.method + ': Train avg   * Acc@1 {top1.avg:.3f}'
+    print(args.method + ': AutoencoderTwoCosts Train avg   * Acc@1 {top1.avg:.3f}'
         .format(top1=top1), flush=True)
     
     writer.add_scalar('Train%s/acc1'%args.method, top1.avg , epoch)
     writer.add_scalar('Train%s/corr'%args.method, corr.avg, epoch)
     writer.add_scalar('Train%s/loss'%args.method, losses.avg, epoch)
    
-    return modelF, modelB,[top1.avg, corr.avg, losses.avg, losslatent.avg]
+    return modelF, modelB,[top1.avg, corr.avg, losses.avg]
 
 
 
-def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
+def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, args, epoch):
 
     
     batch_time = AverageMeter('Time', ':6.3f')
@@ -1260,138 +833,69 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
     modelF.eval()
     modelB.eval()
 
-    with torch.no_grad():
+    
+    end = time.time()
+    for i, (images, target) in enumerate(val_loader):
+
+        
+        if args.gpu is not None:
+            images = images.cuda(args.gpu, non_blocking=True)
+            target = target.cuda(args.gpu, non_blocking=True)
+        else:
+            images = images.cuda()
+            target = target.cuda()
+        
+        onehot.zero_()
+        onehot.scatter_(1, target.view(target.shape[0], 1), 1)
+        
+        if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
+            images= images.expand(-1, 1, -1, -1) #images.expand(-1, 3, -1, -1)
+        
+        # ----- encoder ---------------------
+                    
+        # compute output
+        latents, output = modelF(images)
+
+        losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
+
+        
+        # ----- decoder ------------------ 
+
+        _, recons = modelB(latents.detach())
+    
+        gener = recons
+        reference = images
+        reference = F.interpolate(reference, size=gener.shape[-1])
+
+        lossd = criteriond(gener, reference) #
+
+        # measure correlation and record loss
+        pcorr = correlation(gener, reference)
+        losses.update(lossd.item(), images.size(0))
+        corr.update(pcorr, images.size(0))
+        
+
+
+        
+        # measure accuracy and record loss
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        top1.update(acc1[0].item(), images.size(0))
+
+
+        # measure elapsed time
+        batch_time.update(time.time() - end)
         end = time.time()
-        for i, (images, target) in enumerate(val_loader):
 
-            
-            if args.gpu is not None:
-                images = images.cuda(args.gpu, non_blocking=True)
-                target = target.cuda(args.gpu, non_blocking=True)
-            else:
-                images = images.cuda()
-                target = target.cuda()
-            
-            onehot.zero_()
-            onehot.scatter_(1, target.view(target.shape[0], 1), 1)
-            
-            if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
-                images= images.expand(-1, 1, -1, -1) #images.expand(-1, 3, -1, -1)
-            
-            # ----- encoder ---------------------
-                       
-            # compute output
-            latents, output = modelF(images)
-
-            losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
-
-            # measure accuracy and record loss
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            top1.update(acc1[0].item(), images.size(0))
-
-            # ----- decoder ------------------ 
-
-            latents,  _ = modelF(images)
-            if args.arche.startswith('resnet18c'):
-                recons = images # Diabled modelB
-            else:
-                _, recons = modelB(latents.detach())
-
-            if args.method == 'SLTemplateGenerator':
-                repb = onehot.detach()#modelB(onehot.detach())
-                
-                
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                        
-                        
-                _,targetproj = modelB(repb) #, switches
-
-                inputs_avgcat = torch.zeros_like(images)
-                for t in torch.unique(target):
-                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
-            
-                gener = targetproj
-                reference = inputs_avgcat
+        if i % args.print_freq == 0:
+            progress.display(i)
 
 
-            
-            elif args.method == 'SLError':
-                #TODO: check the norm of subtracts
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _, gener = modelB(repb.detach())
-                reference = images - F.interpolate(recons, size=images.shape[-1])
+    print('Test autoencoderTwoCosts avg {method} * lossd {losses.avg:.3f}'
+        .format(method=args.method,losses=losses), flush=True)
 
-            elif args.method == 'SLRobust':
-                
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _, gener = modelB(repb.detach())
-                reference = images 
-
-            elif args.method == 'SLErrorTemplateGenerator':
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob#modelB(onehot.detach())
-                
-                
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                        
-                        
-                _,targetproj = modelB(repb) #, switches
-
-                inputs_avgcat = torch.zeros_like(images)
-                for t in torch.unique(target):
-                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
-            
-                gener = targetproj
-                reference = inputs_avgcat
-            
-            else: #args.method in ['SLVanilla','BP','FA']:
-                gener = recons
-                reference = images
-            
-            reference = F.interpolate(reference, size=gener.shape[-1])
-
-            if args.lossfuncB == 'TripletMarginLoss':
-                
-                shuffled_batch = reference[torch.randperm(reference.shape[0])]
-                lossd = criteriond(gener, reference, shuffled_batch)
-            else:
-                lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)       
-            
-
-            latents_gener, output_gener = modelF(F.interpolate(recons, size=images.shape[-1]).detach())
-            if args.lossfuncB == 'TripletMarginLoss':
-                shuffled_images = images[torch.randperm(images.shape[0])]
-                latents_shuffled, output = modelF(shuffled_images)
-
-                lossL = criteriond(latents_gener, latents.detach(), latents_shuffled.detach())
-            else:
-                lossL = criteriond(latents_gener, latents.detach())
-
-            pcorr = correlation(gener, reference)
-            losses.update(lossd.item(), images.size(0))
-            corr.update(pcorr, images.size(0))
-            losslatent.update(lossL.item(), images.size(0))
-
-                
-
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
-
-            if i % args.print_freq == 0:
-                progress.display(i)
-
-
-        print('Test avg {method} * lossd {losses.avg:.3f}'
-            .format(method=args.method,losses=losses), flush=True)
-
-        # TODO: this should also be done with the ProgressMeter
-        print('Test avg  {method} * Acc@1 {top1.avg:.3f}'
-            .format(method=args.method, top1=top1), flush=True)
+    # TODO: this should also be done with the ProgressMeter
+    print('Test autoencoderTwoCosts avg  {method} * Acc@1 {top1.avg:.3f}'
+        .format(method=args.method, top1=top1), flush=True)
     
         
     writer.add_scalar('Test%s/acc1'%args.method, top1.avg , epoch)
@@ -1399,7 +903,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
     writer.add_scalar('Test%s/loss'%args.method,losses.avg,epoch)
             
 
-    return modelF, modelB, [top1.avg, corr.avg, losses.avg, losslatent.avg]
+    return modelF, modelB, [top1.avg, corr.avg, losses.avg]
 
 
 def save_checkpoint(state, is_best, filepath=args.resultsdir ,filename='checkpoint.pth.tar'):
