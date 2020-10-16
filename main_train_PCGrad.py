@@ -78,10 +78,10 @@ parser.add_argument(
         type=argparse.FileType(mode='r'))
 
 
-parser.add_argument('--method', type=str, default='BP', metavar='M',
-                    help='method:BP|SLVanilla|SLBP|FA|SLTemplateGenerator')
-parser.add_argument('--method', type=str, default='BiHebb', metavar='M',
-                    help='PCgrad')
+# parser.add_argument('--method', type=str, default='BP', metavar='M',
+#                     help='method:BP|SLVanilla|SLBP|FA|SLTemplateGenerator')
+parser.add_argument('--methodGrad', type=str, default='noPCGrad', metavar='MG',
+                    help='PCgrad|noPCGrad')
 
 parser.add_argument('--resume_training_epochs', type=int, default=0,
                     help='if greater than 0 reads the checkpoint from resultsdir and append results to jsons and csvs')
@@ -100,6 +100,8 @@ if args.config_file:
         args.epochs = args.resume_training_epochs
 
 pp.pprint(arg_dict)
+args.method = 'FA' # Here we are implementing BiHebb manually
+args.algorithm = 'FA'
 print(args.method)
 with open(args.resultsdir+'args.yml', 'w') as outfile:
     
@@ -285,12 +287,6 @@ def main_worker(gpu, ngpus_per_node, args):
                 args.batch_size = int(args.batch_size / ngpus_per_node)
                 args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
     
-    if args.method == 'BP':
-        args.algorithm = 'BP'
-        modelidentifier = 'C' #'Control
-    else:
-        args.algorithm = args.method
-        modelidentifier = 'F'
 
     if 'FullyConnected' in args.arche:
         kwargs_asym = {'algorithm':args.algorithm, 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
@@ -401,7 +397,7 @@ def main_worker(gpu, ngpus_per_node, args):
         schedulerF3.load_state_dict(schedulerF_original)
         
     else:
-        checkpointe = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)
+        checkpointe = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.methodGrad)
         modelF_trained = checkpointe['state_dict']
         args.start_epoch = checkpointe['epoch']
 
@@ -423,7 +419,7 @@ def main_worker(gpu, ngpus_per_node, args):
         schedulerB.load_state_dict(schedulerB_original)
 
     else:
-        checkpointd = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)
+        checkpointd = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.methodGrad)
         modelB_trained = checkpointd['state_dict']
         optimizerB.load_state_dict(checkpointd['optimizer'])
 
@@ -758,9 +754,7 @@ def main_worker(gpu, ngpus_per_node, args):
         # remember best acc@1 and save checkpoint
         is_beste = acce > best_acce
         best_acce = max(acce, best_acce)
-    
-        if args.method == 'BSL':
-            break
+
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
@@ -772,26 +766,18 @@ def main_worker(gpu, ngpus_per_node, args):
                 'best_loss': best_acce,
                 'optimizer' : optimizerF.state_dict(),
                 'scheduler' : schedulerF.state_dict(),
-            }, is_beste, filename='checkpointe_%s.pth.tar'%args.method)
+            }, is_beste, filename='checkpointe_%s.pth.tar'%args.methodGrad)
 
-            if args.method.startswith('SL') or args.method == 'BSL':
-                save_checkpoint({
-                    'epoch': epoch + 1,
-                    'arch': args.archd,
-                    'state_dict': modelB.state_dict(),
-                    'best_loss': best_acce,
-                    'optimizer' : optimizerB.state_dict(),
-                    'scheduler' : schedulerB.state_dict(),
-                }, is_beste,  filename='checkpointd_%s.pth.tar'%args.method)
+
             
             if args.resume_training_epochs:
-                with open('%srun_json_dict_%s.json'%(args.resultsdir, args.method), 'r') as fp:
+                with open('%srun_json_dict_%s.json'%(args.resultsdir, args.methodGrad), 'r') as fp:
                     chkp_run_json_dict = json.load(fp)
                 for k in chkp_run_json_dict.keys():
                     new_item = chkp_run_json_dict[k] + run_json_dict[k]
                     run_json_dict.update({k:new_item})
 
-            with open('%srun_json_dict_%s.json'%(args.resultsdir, args.method), 'w') as fp:
+            with open('%srun_json_dict_%s.json'%(args.resultsdir, args.methodGrad), 'w') as fp:
                 
                 json.dump(run_json_dict, fp, indent=4, sort_keys=True)        
                 fp.write("\n")
@@ -871,27 +857,18 @@ def main_worker(gpu, ngpus_per_node, args):
                     'best_loss': best_acce,
                     'optimizer' : optimizerF.state_dict(),
                     'scheduler' : schedulerF.state_dict(),
-                }, is_beste, filename='checkpointe_%s.pth.tar'%args.method)
+                }, is_beste, filename='checkpointe_%s.pth.tar'%args.methodGrad)
 
-                if args.method.startswith('SL') or args.method == 'BSL':
-                    save_checkpoint({
-                        'epoch': epoch + 1,
-                        'arch': args.archd,
-                        'state_dict': modelB.state_dict(),
-                        'best_loss': best_acce,
-                        'optimizer' : optimizerB.state_dict(),
-                        'scheduler' : schedulerB.state_dict(),
-                    }, is_beste,  filename='checkpointd_%s.pth.tar'%args.method)
                 
                 
                 if args.resume_training_epochs:
-                    with open('%srun_json_dict_%s.json'%(args.resultsdir, args.method), 'r') as fp:
+                    with open('%srun_json_dict_%s.json'%(args.resultsdir, args.methodGrad), 'r') as fp:
                         chkp_run_json_dict = json.load(fp)
                     for k in chkp_run_json_dict.keys():
                         new_item = chkp_run_json_dict[k] + run_json_dict[k]
                         run_json_dict.update({k:new_item})
 
-                with open('%srun_json_dict_%s.json'%(args.resultsdir, args.method), 'w') as fp:
+                with open('%srun_json_dict_%s.json'%(args.resultsdir, args.methodGrad), 'w') as fp:
                     
                     json.dump(run_json_dict, fp, indent=4, sort_keys=True)        
                     fp.write("\n")
@@ -916,7 +893,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
     progress = ProgressMeter(
         len(train_loader),
         [batch_time, data_time, losses, m1, m2],
-        prefix=args.method + "Epoch: [{}]".format(epoch))
+        prefix=args.methodGrad + "Epoch: [{}]".format(epoch))
 
     if args.gpu is not None:
         
@@ -977,15 +954,21 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                         
                         gB = copy.deepcopy(rgetattr(modelB, n).grad)
                         dotp = torch.dot(gF.view(-1), gB.view(-1))
-                        if dotp < 0:
-                            gF = gF - (dotp/(torch.norm(gB))**2)*gB
-                            gB = gB - (dotp/(torch.norm(gF))**2)*gF
 
-                            p.grad = copy.deepcopy(gF)
-                            rgetattr(modelB, n).grad = copy.deepcopy(gB)
+                        if args.methodGrad == 'PCGrad'
+                            if dotp < 0:
+                                gF = gF - (dotp/(torch.norm(gB))**2)*gB
+                                gB = gB - (dotp/(torch.norm(gF))**2)*gF
+
+                                p.grad = copy.deepcopy(gF)
+                                rgetattr(modelB, n).grad = copy.deepcopy(gB)
+                                if 'bn' not in n:
+                                    rgetattr(modelF, n+'_feedback').grad = copy.deepcopy(gF)
+                                    rgetattr(modelB, n+'_feedback').grad = copy.deepcopy(gB)
+                        elif args.methodGrad == 'noPCGrad':
                             if 'bn' not in n:
-                                rgetattr(modelF, n+'_feedback').grad = copy.deepcopy(gF)
-                                rgetattr(modelB, n+'_feedback').grad = copy.deepcopy(gB)
+                                    rgetattr(modelF, n+'_feedback').grad = copy.deepcopy(gF)
+                                    rgetattr(modelB, n+'_feedback').grad = copy.deepcopy(gB)
                             
                     
                     else:
@@ -993,15 +976,20 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                         nB = n.replace('down','up')
                         gB = copy.deepcopy(rgetattr(modelB, nB).grad)
                         dotp = torch.dot(gF.view(-1), gB.view(-1))
-                        if dotp < 0:
-                            gF = gF - (dotp/torch.norm(gB))*gB
-                            gB = gB - (dotp/torch.norm(gF))*gF
+                        if args.methodGrad == 'PCGrad':
+                            if dotp < 0:
+                                gF = gF - (dotp/torch.norm(gB))*gB
+                                gB = gB - (dotp/torch.norm(gF))*gF
 
-                            p.grad = copy.deepcopy(gF)
-                            rgetattr(modelB, nB).grad = copy.deepcopy(gB)
+                                p.grad = copy.deepcopy(gF)
+                                rgetattr(modelB, nB).grad = copy.deepcopy(gB)
+                                if 'bn' not in n:
+                                    rgetattr(modelF, n+'_feedback').grad = copy.deepcopy(gF)
+                                    rgetattr(modelB, nB+'_feedback').grad = copy.deepcopy(gB)
+                        elif args.methodGrad == 'noPCGrad':
                             if 'bn' not in n:
-                                rgetattr(modelF, n+'_feedback').grad = copy.deepcopy(gF)
-                                rgetattr(modelB, nB+'_feedback').grad = copy.deepcopy(gB)
+                                    rgetattr(modelF, n+'_feedback').grad = copy.deepcopy(gF)
+                                    rgetattr(modelB, n+'_feedback').grad = copy.deepcopy(gB)
             
 
 
@@ -1026,15 +1014,15 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         if i % args.print_freq == 0:
             progress.display(i)
 
-    print(args.method + ': Train avg  * lossd {losses.avg:.3f}'
+    print(args.methodGrad + ': Train avg  * lossd {losses.avg:.3f}'
     .format(losses=losses), flush=True)
 
-    print(args.method + ': Train avg   * Acc@1 {top1.avg:.3f}'
+    print(args.methodGrad + ': Train avg   * Acc@1 {top1.avg:.3f}'
         .format(top1=top1), flush=True)
     
-    writer.add_scalar('Train%s/acc1'%args.method, top1.avg , epoch)
-    writer.add_scalar('Train%s/corr'%args.method, corr.avg, epoch)
-    writer.add_scalar('Train%s/loss'%args.method, losses.avg, epoch)
+    writer.add_scalar('Train%s/acc1'%args.methodGrad, top1.avg , epoch)
+    writer.add_scalar('Train%s/corr'%args.methodGrad, corr.avg, epoch)
+    writer.add_scalar('Train%s/loss'%args.methodGrad, losses.avg, epoch)
    
     return modelF, modelB,[top1.avg, corr.avg, losses.avg, losslatent.avg]
 
@@ -1053,7 +1041,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
     progress = ProgressMeter(
         len(val_loader),
         [batch_time, losses, m1, m2],
-        prefix='Test %s: '%args.method)
+        prefix='Test %s: '%args.methodGrad)
     
     if args.gpu is not None:
         
@@ -1103,60 +1091,9 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
             else:
                 _, recons = modelB(latents.detach())
 
-            if args.method == 'SLTemplateGenerator':
-                repb = onehot.detach()#modelB(onehot.detach())
-                
-                
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                        
-                        
-                _,targetproj = modelB(repb) #, switches
-
-                inputs_avgcat = torch.zeros_like(images)
-                for t in torch.unique(target):
-                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
-            
-                gener = targetproj
-                reference = inputs_avgcat
-
-
-            
-            elif args.method == 'SLError':
-                #TODO: check the norm of subtracts
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _, gener = modelB(repb.detach())
-                reference = images - F.interpolate(recons, size=images.shape[-1])
-
-            elif args.method == 'SLRobust':
-                
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _, gener = modelB(repb.detach())
-                reference = images 
-
-            elif args.method == 'SLErrorTemplateGenerator':
-                prob = nn.Softmax(dim=1)(output.detach())
-                repb = onehot - prob#modelB(onehot.detach())
-                
-                
-                repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                        
-                        
-                _,targetproj = modelB(repb) #, switches
-
-                inputs_avgcat = torch.zeros_like(images)
-                for t in torch.unique(target):
-                    inputs_avgcat[target==t] = images[target==t].mean(0) #-inputs[target!=t].mean(0)
-            
-                gener = targetproj
-                reference = inputs_avgcat
-            
-            else: #args.method in ['SLVanilla','BP','FA']:
-                gener = recons
-                reference = images
+ 
+            gener = recons
+            reference = images
             
             reference = F.interpolate(reference, size=gener.shape[-1])
 
@@ -1193,16 +1130,16 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
 
 
         print('Test avg {method} * lossd {losses.avg:.3f}'
-            .format(method=args.method,losses=losses), flush=True)
+            .format(method=args.methodGrad,losses=losses), flush=True)
 
         # TODO: this should also be done with the ProgressMeter
         print('Test avg  {method} * Acc@1 {top1.avg:.3f}'
-            .format(method=args.method, top1=top1), flush=True)
+            .format(method=args.methodGrad, top1=top1), flush=True)
     
         
-    writer.add_scalar('Test%s/acc1'%args.method, top1.avg , epoch)
-    writer.add_scalar('Test%s/corr'%args.method, corr.avg, epoch)
-    writer.add_scalar('Test%s/loss'%args.method,losses.avg,epoch)
+    writer.add_scalar('Test%s/acc1'%args.methodGrad, top1.avg , epoch)
+    writer.add_scalar('Test%s/corr'%args.methodGrad, corr.avg, epoch)
+    writer.add_scalar('Test%s/loss'%args.methodGrad,losses.avg,epoch)
             
 
     return modelF, modelB, [top1.avg, corr.avg, losses.avg, losslatent.avg]
