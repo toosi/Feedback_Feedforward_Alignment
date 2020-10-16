@@ -44,7 +44,7 @@ if [ $config == 0 ]
     # python -u main_train_autoencoders.py --method $method  --config-file $configpath
     # python -u main_train_autoencoders_twocosts.py --method $method  --config-file $configpath
 
-    python -u main_train_PCGrad.py --method $method  --config-file $configpath # --resume_training_epochs 400
+    python -u main_train_PCGrad.py --methodGrad PCGrad  --config-file $configpath # --resume_training_epochs 400
 
 
     # # robustness to noise evaluation

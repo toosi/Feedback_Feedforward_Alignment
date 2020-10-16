@@ -100,8 +100,9 @@ if args.config_file:
         args.epochs = args.resume_training_epochs
 
 pp.pprint(arg_dict)
-args.method = 'FA' # Here we are implementing BiHebb manually
+args.method = 'FA'  # Here we are implementing BiHebb manually
 args.algorithm = 'FA'
+modelidentifier = 'F'
 print(args.method)
 with open(args.resultsdir+'args.yml', 'w') as outfile:
     
@@ -379,6 +380,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     schedulerF3 = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerF3, 'max', patience=args.patiencee, factor=args.factore)
 
+    
     
     modelF_nottrained = torch.load(args.resultsdir+'model%s_untrained.pt'%modelidentifier)
     modelB_nottrained = torch.load(args.resultsdir+'modelB_untrained.pt')
