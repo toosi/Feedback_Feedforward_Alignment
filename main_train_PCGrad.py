@@ -955,7 +955,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                         gB = copy.deepcopy(rgetattr(modelB, n).grad)
                         dotp = torch.dot(gF.view(-1), gB.view(-1))
 
-                        if args.methodGrad == 'PCGrad'
+                        if args.methodGrad == 'PCGrad':
                             if dotp < 0:
                                 gF = gF - (dotp/(torch.norm(gB))**2)*gB
                                 gB = gB - (dotp/(torch.norm(gF))**2)*gF
