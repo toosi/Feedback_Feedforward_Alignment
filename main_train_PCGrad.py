@@ -80,6 +80,8 @@ parser.add_argument(
 
 parser.add_argument('--method', type=str, default='BP', metavar='M',
                     help='method:BP|SLVanilla|SLBP|FA|SLTemplateGenerator')
+parser.add_argument('--method', type=str, default='BiHebb', metavar='M',
+                    help='PCgrad')
 
 parser.add_argument('--resume_training_epochs', type=int, default=0,
                     help='if greater than 0 reads the checkpoint from resultsdir and append results to jsons and csvs')
@@ -946,7 +948,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         # # ----- encoder ---------------------
         # switch to train mode
         modelF.train()
-           
+        modelB.train()   
         # compute output
         latents, output = modelF(images)
         losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
@@ -970,33 +972,37 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             if p.requires_grad == True:
                 gF = copy.deepcopy(p.grad)
                 if 'feedback' not in n:
-                    nB = n +'_feedback'
-                elif 'feedback' in n:
-                    nB = n.replace('_feedback','')
-
-                if 'downsample' not in n:
                     
-                    gB = copy.deepcopy(rgetattr(modelB, n).grad)
-                    dotp = torch.dot(gF.view(-1), gB.view(-1))
-                    if dotp < 0:
-                        gF = gF - (dotp/(torch.norm(gB))**2)*gB
-                        gB = gB - (dotp/(torch.norm(gF))**2)*gF
+                    if 'downsample' not in n:
+                        
+                        gB = copy.deepcopy(rgetattr(modelB, n).grad)
+                        dotp = torch.dot(gF.view(-1), gB.view(-1))
+                        if dotp < 0:
+                            gF = gF - (dotp/(torch.norm(gB))**2)*gB
+                            gB = gB - (dotp/(torch.norm(gF))**2)*gF
 
-                        p.grad = copy.deepcopy(gF)
-                        rgetattr(modelB, n).grad = copy.deepcopy(gF)
-                
-                else:
+                            p.grad = copy.deepcopy(gF)
+                            rgetattr(modelB, n).grad = copy.deepcopy(gB)
+                            if 'bn' not in n:
+                                rgetattr(modelF, n+'_feedback').grad = copy.deepcopy(gF)
+                                rgetattr(modelB, n+'_feedback').grad = copy.deepcopy(gB)
+                            
                     
-                    nB = nB.replace('down','up')
-                    gB = copy.deepcopy(rgetattr(modelB, nB).grad)
-                    dotp = torch.dot(gF.view(-1), gB.view(-1))
-                    if dotp < 0:
-                        gF = gF - (dotp/torch.norm(gB))*gB
-                        gB = gB - (dotp/torch.norm(gF))*gF
+                    else:
+                        
+                        nB = n.replace('down','up')
+                        gB = copy.deepcopy(rgetattr(modelB, nB).grad)
+                        dotp = torch.dot(gF.view(-1), gB.view(-1))
+                        if dotp < 0:
+                            gF = gF - (dotp/torch.norm(gB))*gB
+                            gB = gB - (dotp/torch.norm(gF))*gF
 
-                        p.grad = copy.deepcopy(gF)
-                        rgetattr(modelB, nB).grad = copy.deepcopy(gF)
-        
+                            p.grad = copy.deepcopy(gF)
+                            rgetattr(modelB, nB).grad = copy.deepcopy(gB)
+                            if 'bn' not in n:
+                                rgetattr(modelF, n+'_feedback').grad = copy.deepcopy(gF)
+                                rgetattr(modelB, nB+'_feedback').grad = copy.deepcopy(gB)
+            
 
 
 
