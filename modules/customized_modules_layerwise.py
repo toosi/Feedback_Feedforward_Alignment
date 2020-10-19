@@ -11,6 +11,42 @@ import copy
 
 # In future, it's better to hijack the cpp implementation: https://github.com/pytorch/pytorch/blob/4f1f084d221a7ab9edbf09ab1904edde6d49848c/aten/src/THCUNN/generic/SpatialConvolutionMM.cu
 
+class ReLUFunction(torch.autograd.Function):
+    """
+    We can implement our own custom autograd Functions by subclassing
+    torch.autograd.Function and implementing the forward and backward passes
+    which operate on Tensors.
+    """
+
+    @staticmethod
+    def forward(ctx, input):
+        """
+        In the forward pass we receive a Tensor containing the input and return
+        a Tensor containing the output. ctx is a context object that can be used
+        to stash information for backward computation. You can cache arbitrary
+        objects for use in the backward pass using the ctx.save_for_backward method.
+        """
+        ctx.save_for_backward(input)
+        return input.clamp(min=0)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """
+        In the backward pass we receive a Tensor containing the gradient of the loss
+        with respect to the output, and we need to compute the gradient of the loss
+        with respect to the input.
+        """
+        input = ctx.saved_tensors
+        grad_input = grad_output.clone()
+        grad_input[grad_output < 0] = 0  ## nonlinearity in backward grad_input[input < 0] = 0
+        return grad_input
+
+class ReLU(nn.Module):
+    def __init__(self):
+        super(ReLU, self).__init__()
+    
+    def forward(self, input):
+        return ReLUFunction.apply(input)
 
 class LinearAsymFunc(autograd.Function):
     @staticmethod

@@ -19,10 +19,10 @@ After running the autoencoder with two cost functions:
     * In the main_train there was a second optimizer.step() that I removed after
     subission to NeurIPS' workshop.
 
-In create_config, when creating modelB, algorithm was 'BP' (line 297), I changed it to FA
+    * In create_config, when creating modelB, algorithm was 'BP' (line 297), I changed it to FA
 
-
-    * I changed the modules used in ResLNets from layerwise to simple to test wether I could replicate SLVanilla 81.
+    * 10-19-2020: I changed the modules used in ResLNets from layerwise to simple to test wether I could replicate SLVanilla 81.
+    * 10-19-2020: in modules layerwise, I added custom ReLU which has nonlinear backward, and ommited inplace=True 
 ## SL + BiHebb using PCGrad
 
 In *main_train_PCGrad* I force modelF and modelB to tolerate each other's gradient usnig PCGrad.  
