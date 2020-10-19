@@ -40,14 +40,14 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
 parser.add_argument('-ae', '--arche', metavar='ARCHE', default='ConvDiscr',
                     choices=model_names+['autoencoder','SeeSaw','See','Saw', 'ResNet18F','AsymResNet10F',\
                          'AsymResNet18F','AsymResNet18FNoBN', 'FCDiscrNet',
-                         'AsymResLNet10FNoMaxP', 'fixup_resnet20', 'fixup_resnet14','AsymResLNet10F','AsymResLNet14F','AsymResLNetLimited10F','AsymResLNetLimited14F','asymresnet18','resnet18c', 'FullyConnectedF'],
+                         'AsymResLNet10FNoMaxP', 'fixup_resnet20', 'fixup_resnet14','AsymResLNet10F','AsymResLNet14F','AsymResLNetLimited10F','AsymResLNetLimited14F','asymresnet18','resnet18c', 'FullyConnectedF', 'asymresnet18'],
                     help='model architecture: ' +
                         ' | '.join(model_names) +
                         ' (default: resnet18)')
 parser.add_argument('-ad', '--archd', metavar='ARCHD', default='ConvGene',
                     choices=model_names+['autoencoder','SeeSaw','See','Saw', 'ResNet18B','AsymResNet18B','AsymResNet10B',\
                         'AsymResNet18BUpsamp','AsymResNet18BNoBN', 'FCGeneNet','AsymResLNet10BNoMaxP',
-                        'AsymResNet18BNoMaxPLessReLU', 'fixup_resnetT20','fixup_resnetT14','AsymResLNet10B','AsymResLNet14B','asymresnetT18','resnet18c', 'FullyConnectedB'],
+                        'AsymResNet18BNoMaxPLessReLU', 'fixup_resnetT20','fixup_resnetT14','AsymResLNet10B','AsymResLNet14B','asymresnetT18','resnet18c', 'FullyConnectedB', 'asymresnetT18'],
                     help='model architecture: ' +
                         ' | '.join(model_names) +
                         ' (default: resnet18)')
@@ -172,7 +172,8 @@ if 'AsymResLNet' in args.arche:
 
 elif 'asymresnet' in args.arche:
     toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
-    from models import custom_resnets as custom_models
+    # from models import custom_resnets as custom_models
+    from models import custom_resnets_cifar as custom_models
 
 elif args.arche.startswith('resnet'):
     from models import resnets as custom_models
@@ -285,16 +286,21 @@ else:
 
 if 'FullyConnected' in args.arche:
     kwargs_asym = {'algorithm':'FA', 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
-else:
+elif 'AsymResL' in args.arche:
     kwargs_asym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': not(args.normalization_noaffine)}
+elif 'asymresnet' in args.arche:
+    kwargs_asym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
 
 
 modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_asym)).cuda() #Forward().cuda() # main model
 modelB = nn.parallel.DataParallel(getattr(custom_models, args.archd)(**kwargs_asym)).cuda() # backward network to compute gradients for modelF
 if 'FullyConnected' in args.arche:
-    kwargs_sym = {'algorithm':'BP', 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
-else:
-    kwargs_sym = {'algorithm':'BP', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': not(args.normalization_noaffine)}
+    kwargs_sym = {'algorithm':'FA', 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
+elif 'AsymResL' in args.arche:
+    kwargs_sym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': not(args.normalization_noaffine)}
+elif 'asymresnet' in args.arche:
+    kwargs_sym = {'algorithm':'FA', 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
+
 
 modelC = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_sym)).cuda() # Forward Control model to compare to BP
 

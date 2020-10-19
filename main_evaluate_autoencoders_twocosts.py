@@ -361,6 +361,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # ------load Trained models ---------
     if args.method in ['BP','FA']:
+        
+        epochs_completed = torch.load(args.resultsdir+'checkpointe_autoencoder_%s.pth.tar'%args.method)['epoch']
+        assert epochs_completed>= args.epochs
+
         modelF_trained = torch.load(args.resultsdir+'checkpointe_autoencoder_TwoCosts_%s.pth.tar'%args.method)['state_dict']
         modelB_trained = torch.load(args.resultsdir+'checkpointd_autoencoder_TwoCosts_%s.pth.tar'%args.method)['state_dict']
     
