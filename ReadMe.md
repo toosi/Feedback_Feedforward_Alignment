@@ -18,7 +18,7 @@ reconstrucntion
 After running the autoencoder with two cost functions:
     * In the main_train there was a second optimizer.step() that I removed after
     subission to NeurIPS' workshop.
-
+    * I changed the modules used in ResLNets from layerwise to simple to test wether I could replicate SLVanilla 81.
 ## SL + BiHebb using PCGrad
 
 In *main_train_PCGrad* I force modelF and modelB to tolerate each other's gradient usnig PCGrad.  
