@@ -599,7 +599,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # save statistics
         data_frame = pd.DataFrame(data=results)
-        data_frame.to_csv(args.resultsdir + 'training_results_autoencoders_%s.csv'%args.algorithm)
+        data_frame.to_csv(args.resultsdir + 'training_results_autoencoders_Twocosts_%s.csv'%args.algorithm)
 
         # evaluate alignments
         list_WF = [k for k in modelF.state_dict().keys() if 'feedback' in k]
@@ -685,7 +685,7 @@ def main_worker(gpu, ngpus_per_node, args):
             }, is_beste, filename='checkpointd_autoencoder_TwoCosts_%s.pth.tar'%args.method)
         
             
-            with open('%s/run_json_dict_autoencoder_%s.json'%(args.resultsdir, args.method), 'w') as fp:
+            with open('%s/run_json_dict_autoencoder_Twocosts_%s.json'%(args.resultsdir, args.method), 'w') as fp:
                 
                 json.dump(run_json_dict, fp, indent=4, sort_keys=True)        
                 fp.write("\n")
@@ -744,6 +744,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         # # ----- encoder ---------------------
         # switch to train mode
         modelF.train()
+        modelB.train()
            
         # compute output
         # latents, output = modelF(images)

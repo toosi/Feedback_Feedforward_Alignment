@@ -3,8 +3,8 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 import torchvision.models as models
-# from modules import customized_modules_simple as customized_modules
-from modules import customized_modules_layerwise as customized_modules
+from modules import customized_modules_simple as customized_modules
+# from modules import customized_modules_layerwise as customized_modules
 # from modules import BiHebb_modules as customized_modules
 
 # print('******* in custom_models',torch.__version__,'*******')
