@@ -360,6 +360,8 @@ def main_worker(gpu, ngpus_per_node, args):
     schedulerB = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerB, 'max', patience=args.patienced, factor=args.factord)
 
     # ------load Trained models ---------
+    epochs_completed = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['epoch']
+    assert epochs_completed>= args.epochs
     modelF_trained = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['state_dict']
 
     if args.method == 'BP':

@@ -117,7 +117,8 @@ if 'AsymResLNet' in args.arche:
 
 elif 'asymresnet' in args.arche:
     toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
-    from models import custom_resnets as custom_models
+    # from models import custom_resnets as custom_models
+    from models import custom_resnets_cifar as custom_models
 
 elif args.arche.startswith('resnet'):
     from models import resnets as custom_models
@@ -291,8 +292,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
     if 'FullyConnected' in args.arche:
         kwargs_asym = {'algorithm':args.algorithm, 'hidden_layers':[256, 256, 10], 'nonlinearfunc':'relu', 'input_length':1024}
-    else:
+    elif 'AsymResL' in args.arche:
         kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes, 'normalization_affine': not(args.normalization_noaffine)}
+    elif 'asymresnet' in args.arche:
+        kwargs_asym = {'algorithm':args.algorithm, 'base_channels':args.base_channels, 'image_channels':image_channels, 'n_classes':args.n_classes}
 
     print(kwargs_asym)
     modelF = nn.parallel.DataParallel(getattr(custom_models, args.arche)(**kwargs_asym)).cuda() #Forward().cuda() # main model
@@ -930,6 +933,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         modelB.train()   
         # compute output
         latents, output = modelF(images)
+        print(latents.shape, output.shape)
         losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
 
         # compute gradient and do SGD step
