@@ -78,7 +78,7 @@ class nnReLUFunction(torch.autograd.Function):
 
 class nnReLU(nn.Module):
     def __init__(self):
-        super(ReLUGrad, self).__init__()
+        super(nnReLU, self).__init__()
     
     def forward(self, input, input2):
         return nnReLUFunction.apply(input, input2) #, input2.clamp(min=0).detach()

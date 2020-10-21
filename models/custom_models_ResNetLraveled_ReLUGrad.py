@@ -113,7 +113,7 @@ class AsymResLNet10F(nn.Module):
         pooled = torch.flatten(x, 1)
         # x = self.fc(x)
         
-       xrelus = [xrelu0, xrelu11, xrelu12, xrelu13, xrelu14, xrelu21, xrelu22, xrelu23, xrelu24]
+        xrelus = [xrelu0, xrelu11, xrelu12, xrelu13, xrelu14, xrelu21, xrelu22, xrelu23, xrelu24]
 
         return xrelus, latent, pooled
 
@@ -137,9 +137,9 @@ class AsymResLNet10B(nn.Module):
         self.bn32 = getattr(nn, normalization)(self.base_channels*2, affine=normalization_affine, momentum=0.1, track_running_stats=False)
         self.conv32 = ConvTranspose2d(self.base_channels*2, self.base_channels*2, kernel_size=3,stride=1,  padding=1, output_padding=0, algorithm=algorithm, )
         if nonlin == 'nnReLU':
-            self.relu = nnReLU
+            self.relu = nnReLU()
         elif nonlin == 'ReLUGrad':
-            self.relu = ReLUGrad
+            self.relu = ReLUGrad()
         
         
         self.bn31 = getattr(nn, normalization)(self.base_channels*2, affine=normalization_affine,momentum=0.1, track_running_stats=False)

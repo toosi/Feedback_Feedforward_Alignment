@@ -947,7 +947,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         modelF.train()
            
         # compute output
-        latents, output = modelF(images)
+        xrelus, latents, output = modelF(images)
         losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
 
         # compute gradient and do SGD step
@@ -985,7 +985,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             if args.arche.startswith('resnet18c'):
                 recons = images # Diabled modelB
             else:
-                _, recons = modelB(latents.detach())
+                _, recons = modelB(latents.detach(), [xr.detach() for xr in xrelus])
             
             gener = recons
             reference = images
@@ -1008,12 +1008,12 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         elif args.method.startswith('SL'):
             # ----- decoder ------------------    
             modelF.eval()
-            latents,  output = modelF(images)
+            xrelus, latents,  output = modelF(images)
             modelF.train()
 
             # switch to train mode
             modelB.train()
-            _,recons = modelB(latents.detach()) 
+            _,recons = modelB(latents.detach(), [xr.detach() for xr in xrelus]) 
 
             if 'SLVanilla' in args.method:
                 gener = recons
@@ -1023,7 +1023,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 repb = onehot.detach()#modelB(onehot.detach())            
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                                               
-                _,targetproj = modelB(repb) #, switches
+                _,targetproj = modelB(repb, [xr.detach() for xr in xrelus]) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -1052,14 +1052,14 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 repb = torch.norm(output)*repb/torch.norm(repb)
 
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _,gener = modelB(repb.detach())
+                _,gener = modelB(repb.detach(), [xr.detach() for xr in xrelus])
                 reference = images 
 
             elif 'SLErrorTemplateGenerator' in args.method:
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob#modelB(onehot.detach())       
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)                   
-                _,targetproj = modelB(repb) #, switches
+                _,targetproj = modelB(repb, [xr.detach() for xr in xrelus]) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -1071,7 +1071,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             elif 'SLAdvImg' in args.method:
 
                 images.requires_grad = True
-                _, output = modelF(images)
+                xrelus,_, output = modelF(images)
                 losse = criterione(output, target)
                 modelF.zero_grad()
                 losse.backward()
@@ -1093,10 +1093,10 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 repb = torch.norm(output)*repb/torch.norm(repb)
 
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _,gener = modelB(repb.detach())
+                _,gener = modelB(repb.detach(), [xr.detach() for xr in xrelus])
                 reference = images 
 
-                _, output_gener = modelF(F.interpolate(gener, size=images.shape[-1]))
+                xrelus,_, output_gener = modelF(F.interpolate(gener, size=images.shape[-1]))
             
             elif 'SLGrConv1' in args.method:
                 # !!! requires to be run on a single gpu because of hooks !!!
@@ -1110,7 +1110,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 repb = torch.norm(output)*repb/torch.norm(repb)
 
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                preconv1,_ = modelB(repb.detach())
+                preconv1,_ = modelB(repb.detach(), [xr.detach() for xr in xrelus])
 
                 
                 gener = preconv1
@@ -1121,16 +1121,16 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 hookF = Hook(list(modelF.module._modules.items())[0][1])
                 latent, output = modelF(images)
                 conv1 = hookF.output.detach()
-                preconv1, _ = modelB(latent.detach())
+                preconv1, _ = modelB(latent.detach(), [xr.detach() for xr in xrelus])
                 gener = preconv1
                 reference = conv1
             
             elif 'SLLatentRobust' in args.method:
                 sigma2 = 0.2
 
-                latents, _ = modelF(images)
+                xrelus,latents, _ = modelF(images)
                 delta = torch.empty_like(latents).normal_(mean=0, std=np.sqrt(sigma2)).cuda()
-                _,gener = modelB(latents.detach() + delta)
+                _,gener = modelB(latents.detach() + delta,  [xr.detach() for xr in xrelus])
                 reference = images
                 
      
@@ -1172,9 +1172,9 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
 
         
         if args.method.endswith('CC0'):
-            latents, _ = modelF(images)
-            _,recons = modelB(latents.detach())
-            latents_gener, output_gener = modelF(F.interpolate(recons, size=images.shape[-1]).detach())
+            xrelus,latents, _ = modelF(images)
+            _,recons = modelB(latents.detach(), [xr.detach() for xr in xrelus])
+            xrelus_gener, latents_gener, output_gener = modelF(F.interpolate(recons, size=images.shape[-1]).detach())
             lossCC = criteriond(latents_gener, latents.detach())
             # optimizerF3.zero_grad()
             optimizerF.zero_grad()
@@ -1184,11 +1184,11 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
 
         elif args.method.endswith('CC1'):
             sigma2 = 0.2
-            latents, _ = modelF(images)
+            xrelus, latents, _ = modelF(images)
             delta = torch.empty_like(latents).normal_(mean=0, std=np.sqrt(sigma2)).cuda()
-            _,gener = modelB(latents.detach() + delta)
+            _,gener = modelB(latents.detach() + delta, [xr.detach() for xr in xrelus])
 
-            latents_gener, output_gener = modelF(F.interpolate(gener, size=images.shape[-1]).detach())
+            xrelus_gener, latents_gener, output_gener = modelF(F.interpolate(gener, size=images.shape[-1]).detach())
             lossCC = criteriond(latents_gener-latents.detach(), delta)
             # optimizerF3.zero_grad()
             optimizerF.zero_grad()
@@ -1196,12 +1196,12 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
             # optimizerF3.step()
             optimizerF.step()
 
-        latents, _ = modelF(images)
+        xrelus, latents, _ = modelF(images)
 
         if args.arche.startswith('resnet18c'):
             recons = images # Diabled modelB
         else:
-            _, recons = modelB(latents.detach())
+            _, recons = modelB(latents.detach(), [xr.detach() for xr in xrelus] )
 
       
         lossL = torch.tensor([0]) 
@@ -1281,7 +1281,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
             # ----- encoder ---------------------
                        
             # compute output
-            latents, output = modelF(images)
+            xrelus, latents, output = modelF(images)
 
             losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
 
@@ -1291,11 +1291,11 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
 
             # ----- decoder ------------------ 
 
-            latents,  _ = modelF(images)
+            xrelus, latents,  _ = modelF(images)
             if args.arche.startswith('resnet18c'):
                 recons = images # Diabled modelB
             else:
-                _, recons = modelB(latents.detach())
+                _, recons = modelB(latents.detach(),  [xr.detach() for xr in xrelus])
 
             if args.method == 'SLTemplateGenerator':
                 repb = onehot.detach()#modelB(onehot.detach())
@@ -1304,7 +1304,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
-                _,targetproj = modelB(repb) #, switches
+                _,targetproj = modelB(repb,  [xr.detach() for xr in xrelus]) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -1320,7 +1320,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _, gener = modelB(repb.detach())
+                _, gener = modelB(repb.detach(),  [xr.detach() for xr in xrelus])
                 reference = images - F.interpolate(recons, size=images.shape[-1])
 
             elif args.method == 'SLRobust':
@@ -1328,7 +1328,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
                 prob = nn.Softmax(dim=1)(output.detach())
                 repb = onehot - prob
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                _, gener = modelB(repb.detach())
+                _, gener = modelB(repb.detach(),  [xr.detach() for xr in xrelus])
                 reference = images 
 
             elif args.method == 'SLErrorTemplateGenerator':
@@ -1339,7 +1339,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
                 repb = repb.view(args.batch_size, args.n_classes, 1, 1)
                         
                         
-                _,targetproj = modelB(repb) #, switches
+                _,targetproj = modelB(repb,  [xr.detach() for xr in xrelus]) #, switches
 
                 inputs_avgcat = torch.zeros_like(images)
                 for t in torch.unique(target):
@@ -1362,10 +1362,10 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, epoch):
                 lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)       
             
 
-            latents_gener, output_gener = modelF(F.interpolate(recons, size=images.shape[-1]).detach())
+            xrelus_gener, latents_gener, output_gener = modelF(F.interpolate(recons, size=images.shape[-1]).detach())
             if args.lossfuncB == 'TripletMarginLoss':
                 shuffled_images = images[torch.randperm(images.shape[0])]
-                latents_shuffled, output = modelF(shuffled_images)
+                xrelus_shuffled, latents_shuffled, output = modelF(shuffled_images)
 
                 lossL = criteriond(latents_gener, latents.detach(), latents_shuffled.detach())
             else:

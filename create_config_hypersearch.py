@@ -126,7 +126,7 @@ parser.add_argument('--wdB', '--weight-decayB', default=1e-7, type=float,
                     metavar='W', help='weight decay (default: 1e-5)',
                     dest='wdB')
 
-parser.add_argument('--reluBackward', default='nnReLU', type=float,
+parser.add_argument('--reluBackward', default='nnReLU', type=str,
                     help='relu in modelB: either nn.ReLU or ReLUGrad',
                     dest='reluBackward')                    
 parser.add_argument('--optimizerF', default='RMSprop', type=str,
