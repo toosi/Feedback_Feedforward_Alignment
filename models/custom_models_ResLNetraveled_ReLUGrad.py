@@ -15,7 +15,8 @@ try:
 except ImportError:
     from torch.utils.model_zoo import load_url as load_state_dict_from_url
 
-ReLU = nn.ReLU() #customized_modules.ReLUGrad
+ReLUGrad = customized_modules.ReLUGrad
+nnReLU = customized_modules.nnReLU
 Conv2d = customized_modules.AsymmetricFeedbackConv2d
 ConvTranspose2d = customized_modules.AsymmetricFeedbackConvTranspose2d
 Linear = customized_modules.LinearModule
@@ -30,18 +31,16 @@ class AsymResLNet10F(nn.Module):
         self.conv1 = Conv2d(image_channels, self.base_channels, kernel_size=kernel_size, stride=stride, padding=3, bias=False, algorithm=algorithm)
         self.bn1 = getattr(nn, normalization)(self.base_channels, affine=normalization_affine, momentum=0.1, track_running_stats=False)
         
-        self.relu = ReLU
+        self.relu = nn.ReLU()
 
         # layer 1
         self.conv11 = Conv2d(self.base_channels, self.base_channels, kernel_size=3, stride=1, groups=1, padding=1, algorithm=algorithm)
         self.bn11 = getattr(nn, normalization)(self.base_channels, affine=normalization_affine ,momentum=0.1, track_running_stats=False)
-        self.relu = ReLU
         self.conv12 = Conv2d(self.base_channels, self.base_channels, kernel_size=3,stride=1, padding=1, algorithm=algorithm)
         self.bn12 = getattr(nn, normalization)(self.base_channels, affine=normalization_affine, momentum=0.1,track_running_stats=False)
 
         self.conv21 = Conv2d(self.base_channels, self.base_channels, kernel_size=3,stride=1, padding=1, algorithm=algorithm)
         self.bn21 = getattr(nn, normalization)(self.base_channels, affine=normalization_affine, momentum=0.1,track_running_stats=False)
-        self.relu = ReLU
         self.conv22 = Conv2d(self.base_channels, self.base_channels*2, kernel_size=3, stride=1, padding=1, algorithm=algorithm)
         self.bn22 = getattr(nn, normalization)(self.base_channels*2, affine=normalization_affine, momentum=0.1, track_running_stats=False)
         self.downsample1 =  Conv2d(self.base_channels, self.base_channels*2,kernel_size=1, stride=1, padding=0, algorithm=algorithm)
@@ -51,61 +50,62 @@ class AsymResLNet10F(nn.Module):
         # layer 2
         self.conv31 = Conv2d(self.base_channels*2, self.base_channels*2, kernel_size=3, stride=2, groups=1, padding=1, algorithm=algorithm)
         self.bn31 = getattr(nn, normalization)(self.base_channels*2, affine=normalization_affine,momentum=0.1, track_running_stats=False)
-        self.relu = ReLU
         self.conv32 = Conv2d(self.base_channels*2, self.base_channels*2, kernel_size=3, stride=1, padding=1, algorithm=algorithm)
         self.bn32 = getattr(nn, normalization)(self.base_channels*2, affine=normalization_affine,momentum=0.1, track_running_stats=False)
 
         self.conv41 = Conv2d(self.base_channels*2, self.base_channels*2,  kernel_size=3, stride=1, padding=1, algorithm=algorithm)
         self.bn41 = getattr(nn, normalization)(self.base_channels*2, affine=normalization_affine,momentum=0.1, track_running_stats=False)
-        self.relu = ReLU
         self.conv42 = Conv2d(self.base_channels*2, self.n_classes, kernel_size=3, stride=1, padding=1, algorithm=algorithm)
         self.bn42 = getattr(nn, normalization)(self.n_classes, affine=normalization_affine, momentum=0.1, track_running_stats=False)
         self.downsample2 =  Conv2d(self.base_channels*2, self.n_classes,kernel_size=1, stride=2, padding=0,  algorithm=algorithm, )
         # self.bn43 = nn.BatchNorm2d(self.base_channels*4,momentum=0.1, track_running_stats=False)
 
-
-
-        
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         #self.fc = nn.Linear(self.base_channels*16, 1000)
 
     def forward(self, x):
         
         x = self.conv1(x)
-        
-        x = self.relu(self.bn1(x)) #self.relu(self.bn1(x))
+        xrelu0 = self.bn1(x)
+        x = self.relu(xrelu0) #self.relu(self.bn1(x))
 
         # layer 1
         identity = x
         
         x = self.conv11(x)
-        x = self.relu(self.bn11(x))
+        xrelu11 = self.bn11(x)
+        x = self.relu(xrelu11)
         x = self.conv12(x)
-        x = self.bn12(x)
-        x = self.relu(x)
+        xrelu12 = self.bn12(x)
+        x = self.relu(xrelu12)
 
         x = self.conv21(x)
-        x = self.relu(self.bn21(x))
+        xrelu13 = self.bn21(x)
+        x = self.relu(xrelu13)
         x = self.conv22(x)
         x = self.bn22(x)
         x += self.bn23(self.downsample1(identity)) 
+        xrelu14 = x
         x = self.relu(x)
 
         # layer 2
         identity = x
         
         x = self.conv31(x)
-        x = self.relu(self.bn31(x))
+        xrelu21 = self.bn31(x)
+        x = self.relu(xrelu21)
         x = self.conv32(x)
-        x = self.bn32(x)
-        x = self.relu(x)
+        xrelu22 = self.bn32(x)
+        x = self.relu(xrelu22)
 
         x = self.conv41(x)
-        x = self.relu(self.bn41(x))
+        xrelu23 = self.bn41(x)
+        x = self.relu(xrelu23)
         x = self.conv42(x)
         x = self.bn42(x)
         # x += self.bn43(self.downsample2(identity)) 
         x += self.downsample2(identity)
+        xrelu24 = x
         latent = self.relu(x)
         
 
@@ -113,15 +113,15 @@ class AsymResLNet10F(nn.Module):
         pooled = torch.flatten(x, 1)
         # x = self.fc(x)
         
-        dum = pooled
+       xrelus = [xrelu0, xrelu11, xrelu12, xrelu13, xrelu14, xrelu21, xrelu22, xrelu23, xrelu24]
 
-        return latent, pooled
+        return xrelus, latent, pooled
 
 
 
 
 class AsymResLNet10B(nn.Module):
-    def __init__(self, image_channels=3, n_classes=10, algorithm='FA', kernel_size=7,stride=2 , base_channels=64, normalization='BatchNorm2d', normalization_affine=False):
+    def __init__(self, image_channels=3, n_classes=10, algorithm='FA', kernel_size=7,stride=2 , base_channels=64, normalization='BatchNorm2d', normalization_affine=False, nonlin='nnReLU'):
         super(AsymResLNet10B, self).__init__()
         self.base_channels = base_channels
         self.n_classes = n_classes
@@ -129,14 +129,17 @@ class AsymResLNet10B(nn.Module):
         
          # layer 2
         # self.bn43 = nn.BatchNorm2d(self.base_channels*4,momentum=0.1, track_running_stats=False)
-        self.upsample2 = ConvTranspose2d(self.n_classes, self.base_channels*2,kernel_size=1, stride=2, padding=0, output_padding=1, algorithm=algorithm,)
+        self.upsample2 =  ConvTranspose2d(self.n_classes, self.base_channels*2,kernel_size=1, stride=2, padding=0, output_padding=1, algorithm=algorithm,)
         self.bn42 = getattr(nn, normalization)(self.n_classes, affine=normalization_affine,momentum=0.1, track_running_stats=False)
         self.conv42 = ConvTranspose2d(self.n_classes, self.base_channels*2, kernel_size=3, stride=1, padding=1, output_padding=0, algorithm=algorithm,)
-        self.relu = ReLU
         self.bn41 = getattr(nn, normalization)(self.base_channels*2, affine=normalization_affine,momentum=0.1, track_running_stats=False)
         self.conv41 = ConvTranspose2d(self.base_channels*2, self.base_channels*2, stride=1, kernel_size=3, padding=1, output_padding=0, algorithm=algorithm, )
         self.bn32 = getattr(nn, normalization)(self.base_channels*2, affine=normalization_affine, momentum=0.1, track_running_stats=False)
         self.conv32 = ConvTranspose2d(self.base_channels*2, self.base_channels*2, kernel_size=3,stride=1,  padding=1, output_padding=0, algorithm=algorithm, )
+        if nonlin == 'nnReLU':
+            self.relu = nnReLU
+        elif nonlin == 'ReLUGrad':
+            self.relu = ReLUGrad
         
         
         self.bn31 = getattr(nn, normalization)(self.base_channels*2, affine=normalization_affine,momentum=0.1, track_running_stats=False)
@@ -147,40 +150,36 @@ class AsymResLNet10B(nn.Module):
         self.upsample1 =  ConvTranspose2d(self.base_channels*2, self.base_channels,kernel_size=1, stride=1, padding=0,output_padding=0, algorithm=algorithm,)
         self.bn22 = getattr(nn, normalization)(self.base_channels*2, affine=normalization_affine,momentum=0.1, track_running_stats=False)
         self.conv22 = ConvTranspose2d(self.base_channels*2, self.base_channels, kernel_size=3, stride=1, padding=1, output_padding=0, algorithm=algorithm, )
-        self.relu = ReLU
         self.bn21 = getattr(nn, normalization)(self.base_channels, affine=normalization_affine, momentum=0.1,track_running_stats=False)
         self.conv21 = ConvTranspose2d(self.base_channels, self.base_channels, stride=1, kernel_size=3, padding=1, output_padding=0, algorithm=algorithm, )
         self.bn12 = getattr(nn, normalization)(self.base_channels, affine=normalization_affine, momentum=0.1,track_running_stats=False)
 
         self.conv12 = ConvTranspose2d(self.base_channels, self.base_channels, kernel_size=3,stride=1,  padding=1, output_padding=0, algorithm=algorithm,)
-        self.relu = ReLU
         self.bn11 = getattr(nn, normalization)(self.base_channels, affine=normalization_affine, momentum=0.1,track_running_stats=False)
         self.conv11 = ConvTranspose2d(self.base_channels, self.base_channels, kernel_size=3, stride=1, groups=1, padding=1, output_padding=0, algorithm=algorithm, )
 
 
-        self.relu = ReLU
         self.bn1 = getattr(nn, normalization)(self.base_channels, affine=normalization_affine, momentum=0.1,track_running_stats=False)
         self.conv1 = ConvTranspose2d(self.base_channels, image_channels , kernel_size=kernel_size, stride=stride, padding=2, bias=False, output_padding=1, algorithm=algorithm, ) #output_padding=1
         
 
-    def forward(self, x, s=None):
+    def forward(self, x, xrelus, s=None):
 
-        
         # layer 2 
         identity = x 
         x = self.bn42(x)
         
         x = self.conv42(x)
-        x = self.relu(self.bn41(x))
+        x = self.relu(self.bn41(x), xrelus[8])
         x = self.conv41(x)
-        x = self.relu(x)
+        x = self.relu(x, xrelus[7])
         x = self.bn32(x)
         x = self.conv32(x)
-        x = self.relu(self.bn31(x))
+        x = self.relu(self.bn31(x), xrelus[6])
         x = self.conv31(x)
         # x += self.upsample2(self.bn43(identity))
         x += self.upsample2(identity)
-        x = self.relu(x)
+        x = self.relu(x, xrelus[5])
         
 
 
@@ -188,19 +187,19 @@ class AsymResLNet10B(nn.Module):
         identity = x 
         x = self.bn22(x)
         x = self.conv22(x)
-        x = self.relu(self.bn21(x))
+        x = self.relu(self.bn21(x), xrelus[4])
         x = self.conv21(x)
 
-        x = self.relu(x)
+        x = self.relu(x, xrelus[3])
         x = self.bn12(x)
         x = self.conv12(x)
-        x = self.relu(self.bn11(x))
+        x = self.relu(self.bn11(x), xrelus[2])
         x = self.conv11(x)
         x += self.upsample1(self.bn23(identity)) 
-        x = self.relu(x)
+        x = self.relu(x, xrelus[1])
         
 
-        preconv1 = self.relu(self.bn1(x))
+        preconv1 = self.relu(self.bn1(x), xrelus[0] )
         x = self.conv1(preconv1)
 
 

@@ -8,6 +8,8 @@
 #SBATCH --time=5-00:00:00
 #SBATCH -A issa
 
+echo ${SLURM_ARRAY_TASK_ID}
+
 if [ X"$SLURM_STEP_ID" = "X" -a X"$SLURM_PROCID" = "X"0 ]
 then
   echo " =========================================="
@@ -76,9 +78,9 @@ if [ $config == 0 ]
 
 
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/hypersearchRMSprop.txt'
-    filename='/home/tt2684/Research/Results/Symbio/runswithhash/TwoCostAEcontrolMNIST.txt'
+    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/TwoCostAEcontrolMNIST.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/hypersearchRMSpropNoBN.txt'
-    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/hypersearchsimplemodules.txt'
+    filename='/home/tt2684/Research/Results/Symbio/runswithhash/hypersearchsimplemodules.txt'
 
     n=1
     runnames=()
@@ -98,13 +100,13 @@ if [ $config == 0 ]
     done < $filename
 
     ## when task id picks a runname
-    method=FA
+    method=BP
 
     configpath="/home/tt2684/Research/Results/Symbio/Symbio/${runnames[$SLURM_ARRAY_TASK_ID]}/configs.yml"
     printf " Here $configpath \n"
-    # python -u main_train.py --method $method  --config-file $configpath # --resume_training_epochs 400
-    python -u main_train_autoencoders.py --method $method  --config-file $configpath
-    python -u main_train_autoencoders_twocosts.py --method $method  --config-file $configpath
+    python -u main_train.py --method $method  --config-file $configpath # --resume_training_epochs 400
+    # python -u main_train_autoencoders.py --method $method  --config-file $configpath
+    # python -u main_train_autoencoders_twocosts.py --method $method  --config-file $configpath
 
     
 
@@ -113,9 +115,9 @@ if [ $config == 0 ]
     # do
     # eval_epsilon=0.0
     # # python -u main_evaluate.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
-    python -u main_evaluate_autoencoders.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+    # python -u main_evaluate_autoencoders.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
     # # python -u main_evaluate_dynamic_decoder.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
-    python -u main_evaluate_autoencoders_twocosts.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+    # python -u main_evaluate_autoencoders_twocosts.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
 
     # done
 

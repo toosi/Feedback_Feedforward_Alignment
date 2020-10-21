@@ -8,6 +8,83 @@ from torch.nn.parameter import Parameter
 from torch.nn.modules.utils import _single, _pair
 
 
+class ReLUGradFunction(torch.autograd.Function):
+    """
+    ReLUGrad is a nonlinearity interms of input2 which is used in 
+    backward path
+    """
+
+    @staticmethod
+    def forward(ctx, input, input2):
+        """
+        In the forward pass we receive a Tensor containing the input and return
+        a Tensor containing the output. ctx is a context object that can be used
+        to stash information for backward computation. You can cache arbitrary
+        objects for use in the backward pass using the ctx.save_for_backward method.
+        """
+        ctx.save_for_backward(input, input2)
+        input[input2<0] = 0
+        return input #input.clamp(min=0)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """
+        In the backward pass we receive a Tensor containing the gradient of the loss
+        with respect to the output, and we need to compute the gradient of the loss
+        with respect to the input.
+        """
+        input, input2, = ctx.saved_tensors
+        grad_input = grad_output.clone()
+        grad_input[input2 < 0] = 0
+        return grad_input, None
+
+class ReLUGrad(nn.Module):
+    def __init__(self):
+        super(ReLUGrad, self).__init__()
+    
+    def forward(self, input, input2):
+        return ReLUGradFunction.apply(input, input2)#, input2.clamp(min=0).detach()
+
+
+class nnReLUFunction(torch.autograd.Function):
+    """
+    ReLUGrad is a nonlinearity interms of input2 which is used in 
+    backward path
+    """
+
+    @staticmethod
+    def forward(ctx, input, input2):
+        """
+        In the forward pass we receive a Tensor containing the input and return
+        a Tensor containing the output. ctx is a context object that can be used
+        to stash information for backward computation. You can cache arbitrary
+        objects for use in the backward pass using the ctx.save_for_backward method.
+        """
+        ctx.save_for_backward(input, input2)
+        input[input<0] = 0
+        return input #input.clamp(min=0)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """
+        In the backward pass we receive a Tensor containing the gradient of the loss
+        with respect to the output, and we need to compute the gradient of the loss
+        with respect to the input.
+        """
+        input, input2, = ctx.saved_tensors
+        grad_input = grad_output.clone()
+        grad_input[input < 0] = 0
+        return grad_input, None
+
+class nnReLU(nn.Module):
+    def __init__(self):
+        super(ReLUGrad, self).__init__()
+    
+    def forward(self, input, input2):
+        return nnReLUFunction.apply(input, input2) #, input2.clamp(min=0).detach()
+
+
+
 def linear_fa_backward_hook(module, grad_input, grad_output):
     if grad_input[1] is not None:
         grad_input_fa = grad_output[0].mm(module.weight_feedback)
