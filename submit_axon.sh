@@ -90,7 +90,7 @@ if [ $config == 0 ]
 
 
 
-  runname=Oct19-08-48_CIFAR10_34deb8d3eb_327 #Oct14-09-25_CIFAR10_84b9f34c93_166  #Oct14-09-21_CIFAR10_84b9f34c93_391 # Sep30-11-43_MNIST_4c4b77d125_516   #May25-09-00_CIFAR10_b784081472_181
+  runname=Oct22-11-20_CIFAR10_1ceb8d5fd1_632 #Oct14-09-25_CIFAR10_84b9f34c93_166  #Oct14-09-21_CIFAR10_84b9f34c93_391 # Sep30-11-43_MNIST_4c4b77d125_516   #May25-09-00_CIFAR10_b784081472_181
   # configpath="/home/tahereh/Documents/Research/Results/Symbio/Symbio/$runname/configs.yml"
   configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
   methods=('SLVanilla' 'BP' 'FA') # ('SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
@@ -103,7 +103,7 @@ if [ $config == 0 ]
   
   # python -u main_train_PCGrad.py   --config-file $configpath --method PCGRrad
   
-  # python -u main_train.py --method 'SLError'  --config-file $configpath
+  python -u main_train.py --method 'SLVanilla'  --config-file $configpath
 
   # printf " $methods \n"
   # SLConv1 needs to be run in one gpu because of hooks

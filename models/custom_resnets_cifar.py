@@ -149,7 +149,7 @@ class AsymResNet(nn.Module):
 
     def __init__(self, block, layers, n_classes=10,image_channels=3,base_channels=64, zero_init_asymresidual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
-                 norm_layer=None, algorithm='BP'):
+                 norm_layer=None, normalization_affine=True, algorithm='BP'):
         super(AsymResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -467,7 +467,7 @@ class AsymResNetT(nn.Module):
 
     def __init__(self, block, layers, n_classes=10, image_channels=3, base_channels=64, zero_init_asymresidual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
-                 norm_layer=None, algorithm='BP'):
+                 norm_layer=None, normalization_affine=True, algorithm='BP'):
         super(AsymResNetT, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d

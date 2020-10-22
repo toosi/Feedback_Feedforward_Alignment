@@ -354,7 +354,6 @@ else:
     # dict_params_middleF = {'params':[p for n,p in list(modelF.named_parameters()) if n not in ['module.conv1.weight','module.downsample2.weight']]}
     # list_paramsF = [dict_params_firstF, dict_params_middleF, dict_params_lastF]
 #     list_paramsF = [p for p in list(modelF.parameters()) if p.requires_grad==True]
-    print(modelF)
     list_paramsF = [p for n,p in list(modelF.named_parameters()) if 'feedback' not in n]
 
     # dict_params_firstC = {'params':[p for n,p in list(modelC.named_parameters()) if n in ['module.conv1.weight']], 'weight_decay':1e-4}
