@@ -1,9 +1,9 @@
 #!/bin/sh
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
-#SBATCH -c 40
-#SBATCH --gres=gpu:4
-#SBATCH --mem=80gb
+#SBATCH -c 20
+#SBATCH --gres=gpu:2
+#SBATCH --mem=40gb
 #SBATCH --array=0-2
 #SBATCH --time=5-00:00:00
 
@@ -20,7 +20,7 @@ module load anaconda3-2019.03
 source activate /home/tt2684/conda-envs/pytorch_tensorflow_latest
 
 now=$(date +'%Y-%m-%d_%H-%M')
-note='**TestCIFAR**'
+note='**TestCIFARmomentum**'
 # Revisit_Asymresnet_AffineFalse
 # imagenet_with_modified_resnets_wobn1_trackFalse_wolastAcc
 # Cycle_Consistency AdvTrainingFGSM_epsilon0.2_withOUTSperateOptimizerscheduler
@@ -45,6 +45,7 @@ config=0
 # python -u create_config.py --hash CIFAR10AsymResLNet10BNaffPatience30 -dataset CIFAR10  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 400 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 30 --patienced 20 -p 100 --note  $note ; config=1  #
 # python -u create_config.py  -dataset CIFAR10  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 400 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
+# python -u create_config_hypersearch.py --reluBackward nnReLU  --momentumF 0.8 --momentumB 0.1 -dataset CIFAR10    -j 24 --input_size 32 --base_channels 64 --batch-size 512 --epoch 400 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 30 --patienced 20 -p 100 --note  $note ; config=1  #
 
 
 # python -u create_config.py -dataset imagenet  -j 4 --input_size 224  --batch-size 256 --epoch 500 -ae 'asymresnet18' -ad 'asymresnetT18' --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-1 --lrB 1e-3 --wdF 1e-4 --wdB 1e-6 --patiencee 10 --patienced 8 -p 100 --note  $note ; config=1  #
@@ -66,7 +67,7 @@ config=0
 
 if [ $config == 0 ]
   then
-  # runname='May09-13-40_CIFAR10_adf3aac7c7_866' #'May06-11-39_CIFAR10_adf3aac7c7_918' # 'Feb14-09-08_CIFAR10_a3e0466f41_592'  #
+  runname='Oct22-09-23_CIFAR10_1ceb8d5fd1_393' #'May06-11-39_CIFAR10_adf3aac7c7_918' # 'Feb14-09-08_CIFAR10_a3e0466f41_592'  #
   
   # runnames=('May09-08-33_CIFAR10_adf3aac7c7_878' 'May09-08-33_CIFAR10_adf3aac7c7_835' 'May09-08-33_CIFAR10_adf3aac7c7_85' 'May09-08-34_CIFAR10_adf3aac7c7_372')
   
@@ -90,7 +91,7 @@ if [ $config == 0 ]
 
 
 
-  runname=Oct19-08-48_CIFAR10_34deb8d3eb_327 #Oct14-09-25_CIFAR10_84b9f34c93_166  #Oct14-09-21_CIFAR10_84b9f34c93_391 # Sep30-11-43_MNIST_4c4b77d125_516   #May25-09-00_CIFAR10_b784081472_181
+  #Oct14-09-25_CIFAR10_84b9f34c93_166  #Oct14-09-21_CIFAR10_84b9f34c93_391 # Sep30-11-43_MNIST_4c4b77d125_516   #May25-09-00_CIFAR10_b784081472_181
   # configpath="/home/tahereh/Documents/Research/Results/Symbio/Symbio/$runname/configs.yml"
   configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
   methods=('SLVanilla' 'BP' 'FA') # ('SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
@@ -100,7 +101,8 @@ if [ $config == 0 ]
   # methods=('BPCC1' 'FACC1' 'SLVanillaCC1' 'SLErrorCC1' 'SLAdvImgCC1' 'SLAdvCostCC1')
   # methods=('BP' 'FA' 'SLVanilla' 'SLLatentRobust' 'SLAdvImg' 'SLError')
   # python -u main_train.py   --config-file $configpath --method "${methods[$SLURM_ARRAY_TASK_ID]}"
-  
+  python -u main_train_hypersearch.py   --config-file $configpath --method "${methods[$SLURM_ARRAY_TASK_ID]}"
+
   # python -u main_train_PCGrad.py   --config-file $configpath --method PCGRrad
   
   # python -u main_train.py --method 'SLError'  --config-file $configpath
