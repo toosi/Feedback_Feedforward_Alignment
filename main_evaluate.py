@@ -121,13 +121,14 @@ if 'AsymResLNet' in args.arche:
 
 elif 'asymresnet' in args.arche:
     toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
-    from models import custom_resnets as custom_models
+
+    from models import custom_resnets_cifar as custom_models
 
 elif args.arche.startswith('resnet'):
     from models import resnets as custom_models
     #just for compatibality
     toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
-elif  'FullyConnected' in args.arche:
+elif 'FullyConnected' in args.arche:
     toggle_state_dict = state_dict_utils.toggle_state_dict
 
     from models import custom_models
@@ -361,7 +362,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # ------load Trained models ---------
     epochs_completed = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['epoch']
-    assert epochs_completed>= args.epochs
+    assert epochs_completed>= args.epochs, print('loaded epochs %d but args.epoch=%d'%(epochs_completed, args.epoch))
     
     modelF_trained = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['state_dict']
     # if args.method.startswith('SL') or args.method == 'BSL':
@@ -371,10 +372,15 @@ def main_worker(gpu, ngpus_per_node, args):
     
     if args.algorithm in ['BP','FA']:
         
-        modelB_trained = toggle_state_dict(modelF_trained)
-        if args.arche.startswith('FullyConn'):
+        if 'AsymResLNet' in args.arche:
+            modelB_trained =toggle_state_dict(modelF.state_dict())
+        elif 'asymresnet' in args.arche:
+            modelB_trained =toggle_state_dict(modelF.state_dict(), modelB.state_dict())
+
+        elif args.arche.startswith('FullyConn'):
             
             modelB_trained = state_dict_utils.toggle_weights(modelB.state_dict(), modelF_trained)
+ 
         
     else:
         modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']

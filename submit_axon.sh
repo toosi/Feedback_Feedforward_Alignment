@@ -2,9 +2,9 @@
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
 #SBATCH -c 20
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:4
 #SBATCH --mem=40gb
-#SBATCH --array=0-2
+# %#SBATCH --array=0-2
 #SBATCH --time=5-00:00:00
 
 if [ X"$SLURM_STEP_ID" = "X" -a X"$SLURM_PROCID" = "X"0 ]
@@ -20,7 +20,7 @@ module load anaconda3-2019.03
 source activate /home/tt2684/conda-envs/pytorch_tensorflow_latest
 
 now=$(date +'%Y-%m-%d_%H-%M')
-note='**TestCIFARmomentum**'
+note='**TestCIFARmomentumAsymresnet**'
 # Revisit_Asymresnet_AffineFalse
 # imagenet_with_modified_resnets_wobn1_trackFalse_wolastAcc
 # Cycle_Consistency AdvTrainingFGSM_epsilon0.2_withOUTSperateOptimizerscheduler
@@ -33,6 +33,27 @@ printf "********************************************************** \n"
 
 ####Command to execute Python program
 config=0
+
+
+#Search grid
+python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0 --momentumB 0 -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 512 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-4 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0 --momentumB 0. -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-5 --lrB 1e-5 --wdF 1e-6 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0. --momentumB 0 -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-4 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0. --momentumB 0. -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+
+
+# python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0 --momentumB 0 -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 512 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-4 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0 --momentumB 0. -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-5 --lrB 1e-5 --wdF 1e-6 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0. --momentumB 0 -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-4 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0. --momentumB 0. -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+
+
+
+
+
+
+
+
 # init='May25-14-32_CIFAR10_9fb773a12e_987' # use: -loadinitialization $init
 # Fully Connected
 # python -u create_config.py  --hash RMSpRMSpFaMNISTFullyConnE150  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-5 --wdB 1e-5 --patiencee 20 --patienced 15 -dataset FashionMNIST -j16 --input_size 32 --batch-size 256 --epoch 150 -ae FullyConnectedF -ad FullyConnectedB -p 100 --note  $note ; config=1 
@@ -41,6 +62,7 @@ config=0
 # python -u create_config.py --hash FaMNISTAsymResLNet10BNaff -dataset FashionMNIST  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
 
+# python -u create_config.py  -dataset CIFAR10 --momentumF 0.1 --momentumB 0.1 -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 400  --optimizerF 'SGD' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-4 --wdB 1e-5 --patiencee 30 --patienced 20 -p 100 --note  $note ; config=1  #
 
 # python -u create_config.py --hash CIFAR10AsymResLNet10BNaffPatience30 -dataset CIFAR10  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 400 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 30 --patienced 20 -p 100 --note  $note ; config=1  #
 # python -u create_config.py  -dataset CIFAR10  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 400 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
@@ -67,7 +89,7 @@ config=0
 
 if [ $config == 0 ]
   then
-  runname='Oct22-09-23_CIFAR10_1ceb8d5fd1_393' #'May06-11-39_CIFAR10_adf3aac7c7_918' # 'Feb14-09-08_CIFAR10_a3e0466f41_592'  #
+  runname='Oct23-06-38_CIFAR10_4623412840_hypsaymresnet18lr_353' #'May06-11-39_CIFAR10_adf3aac7c7_918' # 'Feb14-09-08_CIFAR10_a3e0466f41_592'  #
   
   # runnames=('May09-08-33_CIFAR10_adf3aac7c7_878' 'May09-08-33_CIFAR10_adf3aac7c7_835' 'May09-08-33_CIFAR10_adf3aac7c7_85' 'May09-08-34_CIFAR10_adf3aac7c7_372')
   
@@ -100,12 +122,12 @@ if [ $config == 0 ]
   # methods=('SLAdvImgCC0' 'SLAdvCostCC0' 'BPCC0' 'FACC0' 'SLVanillaCC0' 'SLErrorCC0' )
   # methods=('BPCC1' 'FACC1' 'SLVanillaCC1' 'SLErrorCC1' 'SLAdvImgCC1' 'SLAdvCostCC1')
   # methods=('BP' 'FA' 'SLVanilla' 'SLLatentRobust' 'SLAdvImg' 'SLError')
-  # python -u main_train.py   --config-file $configpath --method "${methods[$SLURM_ARRAY_TASK_ID]}"
-  python -u main_train_hypersearch.py   --config-file $configpath --method "${methods[$SLURM_ARRAY_TASK_ID]}"
+  python -u main_train.py   --config-file $configpath --method "${methods[$SLURM_ARRAY_TASK_ID]}"
+  # python -u main_train_hypersearch.py   --config-file $configpath --method "${methods[$SLURM_ARRAY_TASK_ID]}"
 
   # python -u main_train_PCGrad.py   --config-file $configpath --method PCGRrad
   
-  python -u main_train.py --method 'SLVanilla'  --config-file $configpath
+  # python -u main_train.py --method 'SLError'  --config-file $configpath
 
   # printf " $methods \n"
   # SLConv1 needs to be run in one gpu because of hooks
@@ -120,6 +142,17 @@ if [ $config == 0 ]
   # done
 
 
+  method='SLVanilla'
+  # robustness to noise evaluation
+  for eval_sigma2 in `seq 1e-3 0.1 1.0` # why start at 1e-3 instead of zero? becuase numpy. doesn't accept zero as sigma2 
+  do
+  eval_epsilon=0.0
+  python -u main_evaluate.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+  # python -u main_evaluate_autoencoders.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+  # python -u main_evaluate_dynamic_decoder.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+  # python -u main_evaluate_autoencoders_twocosts.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+
+  done
   # # remember to run on 1 gpu to make sure hooks work as expected
   # methods='SLVanilla BP FA' # SLRobust SLError
   # for method in $methods
