@@ -947,6 +947,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         # # ----- encoder ---------------------
         # switch to train mode
         modelF.train()
+        modelB.train()
            
         # compute output
         latents, output = modelF(images)
@@ -983,7 +984,7 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 modelB.load_state_dict(toggle_state_dict(modelF.state_dict(), modelB.state_dict()))
 
 
-        if any(m in args.method for m in ['FA','BP', 'BSL']):
+        if any(m in args.method for m in ['FA','BP','BSL']):
             if args.arche.startswith('resnet18c'):
                 recons = images # Diabled modelB
             else:
@@ -1009,12 +1010,11 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
 
         elif args.method.startswith('SL'):
             # ----- decoder ------------------    
-            modelF.eval()
             latents,  output = modelF(images)
-            modelF.train()
+            
 
             # switch to train mode
-            modelB.train()
+            
             _,recons = modelB(latents.detach()) 
 
             if 'SLVanilla' in args.method:

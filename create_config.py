@@ -232,8 +232,7 @@ if args.hash is not None:
     if not os.path.exists(path_prefix+'/Results/Symbio/runswithhash'):
         os.makedirs(path_prefix+'/Results/Symbio/runswithhash')
     with open(path_prefix+'/Results/Symbio/runswithhash/%s.txt'%args.hash, "a") as file:
-        file.write("\n")
-        file.write(args.runname)
+        file.write('%s\n'%args.runname)
 
 
 args.resultsdir = path_prefix+'/Results/Symbio/Symbio/%s/'%args.runname

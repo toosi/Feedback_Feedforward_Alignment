@@ -454,67 +454,67 @@ def main_worker(gpu, ngpus_per_node, args):
         root_imageset = path_prefix+'/Data/DiCarlo/'
         val_loader = helper_functions.load_dataset(root_imageset+'hvm%s/'%variation)
 
-    # optionally resume from a checkpoint
-    if args.resume:
-        if os.path.isfile(args.resume+'checkpointe.pth.tar'):
-            print("=> loading checkpoint '{}'".format(args.resume))
+    ## optionally resume from a checkpoint
+    # if args.resume:
+        # if os.path.isfile(args.resume+'checkpointe.pth.tar'):
+            # print("=> loading checkpoint '{}'".format(args.resume))
 
-            checkpointe = torch.load(args.resume+'checkpointe.pth.tar')
-            args.start_epoch = checkpointe['epoch']
-            best_acce = checkpointe['best_loss']
-            if args.gpu is not None:
+            # checkpointe = torch.load(args.resume+'checkpointe.pth.tar')
+            # args.start_epoch = checkpointe['epoch']
+            # best_acce = checkpointe['best_loss']
+            # if args.gpu is not None:
                 # best_loss may be from a checkpoint from a different GPU
-                best_acce = best_acce.to(args.gpu)
-            modelF.load_state_dict(checkpointe['state_dict'])
-            optimizerF.load_state_dict(checkpointe['optimizer'])
+                # best_acce = best_acce.to(args.gpu)
+            # modelF.load_state_dict(checkpointe['state_dict'])
+            # optimizerF.load_state_dict(checkpointe['optimizer'])
 
-            checkpointd = torch.load(args.resume+'checkpointd.pth.tar')
-            args.start_epoch = checkpointd['epoch']
-            best_lossd = checkpointd['best_loss']
-            if args.gpu is not None:
+            # checkpointd = torch.load(args.resume+'checkpointd.pth.tar')
+            # args.start_epoch = checkpointd['epoch']
+            # best_lossd = checkpointd['best_loss']
+            # if args.gpu is not None:
                 # best_loss may be from a checkpoint from a different GPU
-               best_lossd = best_lossd.to(args.gpu)
-            modelB.load_state_dict(checkpointd['state_dict'])
-            optimizerB.load_state_dict(checkpointd['optimizer'])
+            #    best_lossd = best_lossd.to(args.gpu)
+            # modelB.load_state_dict(checkpointd['state_dict'])
+            # optimizerB.load_state_dict(checkpointd['optimizer'])
 
-            print("=> loaded checkpoint '{}' (epoch {})"
-                  .format(args.resume, checkpointe['epoch']))
-        else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
+            # print("=> loaded checkpoint '{}' (epoch {})"
+                #   .format(args.resume, checkpointe['epoch']))
+        # else:
+            # print("=> no checkpoint found at '{}'".format(args.resume))
 
-        if os.path.isfile(args.resume+'checkpointeFA.pth.tar'):
-            print("=> loading checkpoint FA '{}'".format(args.resume))
+        # if os.path.isfile(args.resume+'checkpointeFA.pth.tar'):
+            # print("=> loading checkpoint FA '{}'".format(args.resume))
 
-            checkpointeFA = torch.load(args.resume+'checkpointeFA.pth.tar')
-            best_acce = checkpointeFA['best_loss']
-            if args.gpu is not None:
+            # checkpointeFA = torch.load(args.resume+'checkpointeFA.pth.tar')
+            # best_acce = checkpointeFA['best_loss']
+            # if args.gpu is not None:
                 # best_loss may be from a checkpoint from a different GPU
-                best_acce = best_acce.to(args.gpu)
-            modelFFA.load_state_dict(checkpointeFA['state_dict'])
-            optimizerFFA.load_state_dict(checkpointeFA['optimizer'])
+                # best_acce = best_acce.to(args.gpu)
+            # modelFFA.load_state_dict(checkpointeFA['state_dict'])
+            # optimizerFFA.load_state_dict(checkpointeFA['optimizer'])
 
 
-            print("=> loaded checkpoint FA'{}' (epoch {})"
-                  .format(args.resume, checkpointeFA['epoch']))
-        else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
+            # print("=> loaded checkpoint FA'{}' (epoch {})"
+                #   .format(args.resume, checkpointeFA['epoch']))
+        # else:
+            # print("=> no checkpoint found at '{}'".format(args.resume))
 
-        if os.path.isfile(args.resume+'checkpointeBP.pth.tar'):
-            print("=> loading checkpoint BP '{}'".format(args.resume))
+        # if os.path.isfile(args.resume+'checkpointeBP.pth.tar'):
+            # print("=> loading checkpoint BP '{}'".format(args.resume))
 
-            checkpointeBP = torch.load(args.resume+'checkpointeBP.pth.tar')
-            best_acce = checkpointeBP['best_loss']
-            if args.gpu is not None:
+            # checkpointeBP = torch.load(args.resume+'checkpointeBP.pth.tar')
+            # best_acce = checkpointeBP['best_loss']
+            # if args.gpu is not None:
                 # best_loss may be from a checkpoint from a different GPU
-                best_acce = best_acce.to(args.gpu)
-            modelFBP.load_state_dict(checkpointeBP['state_dict'])
-            optimizerFBP.load_state_dict(checkpointeBP['optimizer'])
+                # best_acce = best_acce.to(args.gpu)
+            # modelFBP.load_state_dict(checkpointeBP['state_dict'])
+            # optimizerFBP.load_state_dict(checkpointeBP['optimizer'])
 
 
-            print("=> loaded checkpoint BP'{}' (epoch {})"
-                  .format(args.resume, checkpointeBP['epoch']))
-        else:
-            print("=> no checkpoint BP found at '{}'".format(args.resume))
+            # print("=> loaded checkpoint BP'{}' (epoch {})"
+                #   .format(args.resume, checkpointeBP['epoch']))
+        # else:
+            # print("=> no checkpoint BP found at '{}'".format(args.resume))
 
     cudnn.benchmark = True
 

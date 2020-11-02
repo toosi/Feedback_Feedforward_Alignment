@@ -4,11 +4,11 @@ import numpy as np
 import torch.nn.functional as F
 import torchvision.models as models
 # from modules import customized_modules_simple as customized_modules
-from modules import customized_modules_layerwise as customized_modules
-# from modules import BiHebb_modules as customized_modules  # used for NeuIPS2020
+# from modules import customized_modules_layerwise as customized_modules
+from modules import BiHebb_modules as customized_modules  # used for NeurIPS2020
 
 Linear = customized_modules.LinearModule
-ReLU = customized_modules.ReLU
+# ReLU = customized_modules.ReLU
 
 class FullyConnectedF(nn.Module):
     def __init__(self, hidden_layers, nonlinearfunc, input_length, algorithm):

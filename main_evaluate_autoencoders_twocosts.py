@@ -121,7 +121,7 @@ if 'AsymResLNet' in args.arche:
 
 elif 'asymresnet' in args.arche:
     toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
-    from models import custom_resnets as custom_models
+    from models import custom_resnets_cifar as custom_models
 
 elif args.arche.startswith('resnet'):
     from models import resnets as custom_models
@@ -408,12 +408,30 @@ def main_worker(gpu, ngpus_per_node, args):
         # n_classes = 1000
 
     elif 'CIFAR' in args.dataset:
-
+        train_mean = (0.4914, 0.4822, 0.4465)
+        train_std = (0.2023, 0.1994, 0.2010)
+        transform_train = transforms.Compose([
+        transforms.Resize(input_size),
+        transforms.RandomCrop(input_size, padding=4),
+        # transforms.RandomAffine(degrees=30),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(train_mean, train_std),
+        ])
 
         transform_test = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize(train_mean, train_std),
         ])
+
+        train_dataset = getattr(datasets, args.dataset)(root=args.imagesetdir, train=True, download=True, transform=transform_train)
+        if args.distributed:
+            train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        else:
+            train_sampler = None
+        
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,sampler=train_sampler, shuffle=(train_sampler is None), num_workers=args.workers, drop_last=True)
+
 
         test_dataset = getattr(datasets, args.dataset)(root=args.imagesetdir, train=False, download=True, transform=transform_test)
         val_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, drop_last=True)

@@ -342,7 +342,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
     # scheduler for autoenoder has to go for 'min' instead of max, becuase this time it's a reconstruction cost
-    schedulerF = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerF, 'min', patience=args.patiencee, factor=args.factore)
+    schedulerF = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerF, 'max', patience=args.patiencee, factor=args.factore)
 
 
     
@@ -640,9 +640,9 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # ---- adjust learning rates ----------
 
-        adjust_learning_rate(schedulerF, acce)
+        # adjust_learning_rate(schedulerF, acce) NeurIPS
+        adjust_learning_rate(schedulerF, corrd)
 
-        # adjust_learning_rate(schedulerF3, acce)
 
         # remember best acc@1 and save checkpoint
         is_beste = acce > best_acce
