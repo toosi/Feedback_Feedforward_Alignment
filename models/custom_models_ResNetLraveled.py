@@ -3,8 +3,8 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 import torchvision.models as models
-# from modules import customized_modules_simple as customized_modules
-from modules import customized_modules_layerwise as customized_modules
+from modules import customized_modules_simple as customized_modules
+# from modules import customized_modules_layerwise as customized_modules
 # from modules import BiHebb_modules as customized_modules
 
 # print('******* in custom_models',torch.__version__,'*******')
@@ -15,7 +15,7 @@ try:
 except ImportError:
     from torch.utils.model_zoo import load_url as load_state_dict_from_url
 
-ReLU = nn.ReLU() #customized_modules.ReLUGrad
+ReLU = nn.ReLU(inplace=True) #customized_modules.ReLUGrad
 Conv2d = customized_modules.AsymmetricFeedbackConv2d
 ConvTranspose2d = customized_modules.AsymmetricFeedbackConvTranspose2d
 Linear = customized_modules.LinearModule

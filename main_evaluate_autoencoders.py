@@ -870,25 +870,25 @@ def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, a
 
         
         
-            # measure accuracy and record loss
-            losse = criterione(output, target) 
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            top1.update(acc1[0].item(), images.size(0))
+        # measure accuracy and record loss
+        losse = criterione(output, target) 
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        top1.update(acc1[0].item(), images.size(0))
 
-            # measure correlation and record loss
-            reference = F.interpolate(reference, size=gener.shape[-1])
-            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+        # measure correlation and record loss
+        reference = F.interpolate(reference, size=gener.shape[-1])
+        lossd = criteriond(gener, reference) 
 
-            pcorr = correlation(gener, reference)
-            losses.update(lossd.item(), images.size(0))
-            corr.update(pcorr, images.size(0))
-                
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
+        pcorr = correlation(gener, reference)
+        losses.update(lossd.item(), images.size(0))
+        corr.update(pcorr, images.size(0))
+            
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
 
-            if i % args.print_freq == 0:
-                progress.display(i)
+        if i % args.print_freq == 0:
+            progress.display(i)
 
 
     print('Test avg {method} sigma2 {sigma2} itr: {itr} * lossd {losses.avg:.3f}'

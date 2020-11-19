@@ -1,11 +1,10 @@
 #!/bin/sh
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
-#SBATCH -c 10
-#SBATCH --gres=gpu:1
-#SBATCH --mem=20gb
-# $# SBATCH --array=0-1
-#SBATCH --time=5-00:00:00
+#SBATCH -c 80
+#SBATCH --gres=gpu:8
+#SBATCH --mem=120gb
+#SBATCH --array=0-2
 
 if [ X"$SLURM_STEP_ID" = "X" -a X"$SLURM_PROCID" = "X"0 ]
 then
@@ -17,10 +16,10 @@ fi
 
 module load anaconda3-2019.03
 
-source activate /home/tt2684/conda-envs/pytorch_tensorflow_latest
+conda activate /home/tt2684/conda-envs/pytorch_tensorflow_latest
 
 now=$(date +'%Y-%m-%d_%H-%M')
-note='**TestCIFARmomentumAsymresnet**'
+note='**imagenet**'
 # Revisit_Asymresnet_AffineFalse
 # imagenet_with_modified_resnets_wobn1_trackFalse_wolastAcc
 # Cycle_Consistency AdvTrainingFGSM_epsilon0.2_withOUTSperateOptimizerscheduler
@@ -34,12 +33,16 @@ printf "********************************************************** \n"
 ####Command to execute Python program
 config=0
 
+# /home/tt2684/conda-envs/pytorch_tensorflow_latest/bin/python -u create_config.py  -dataset imagenet --momentumF 0. --momentumB 0. -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 64 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-4 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+
+
 
 #Search grid
-# python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0 --momentumB 0 -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 512 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-4 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
-# python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0 --momentumB 0. -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-5 --lrB 1e-5 --wdF 1e-6 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
-# python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0. --momentumB 0 -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-4 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
-# python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0. --momentumB 0. -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py --hash hypAsymResNetL10 -dataset CIFAR10 --momentumF 0 --momentumB 0. -ae AsymResLNet10F -ad AsymResLNet10B  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-5 --lrB 1e-5 --wdF 1e-6 --wdB 1e-6 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py --hash hypAsymResNetL10 -dataset CIFAR10 --momentumF 0. --momentumB 0 -ae AsymResLNet10F -ad AsymResLNet10B  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-4 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py --hash hypAsymResNetL10 -dataset CIFAR10 --momentumF 0. --momentumB 0. -ae AsymResLNet10F -ad AsymResLNet10B  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py --hash AsymResNetL10Simple -dataset CIFAR10 --momentumF 0. --momentumB 0. -ae AsymResLNet10F -ad AsymResLNet10B  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-4 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+# python -u create_config.py --hash hypAsymResNetL10 -dataset CIFAR10 --momentumF 0. --momentumB 0. -ae AsymResLNet10F -ad AsymResLNet10B  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-4 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
 
 # python -u create_config.py --hash hypsaymresnet18 -dataset CIFAR10 --momentumF 0 --momentumB 0 -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 512 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-4 --lrB 1e-4 --wdF 1e-4 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
@@ -90,7 +93,7 @@ config=0
 
 if [ $config == 0 ]
   then
-  runname='Nov01-11-10_MNIST_4d91649eea_TestMNIST_999'
+  runname='Nov19-09-39_imagenet_d0236dbe9e_700'
   
   # runnames=('May09-08-33_CIFAR10_adf3aac7c7_878' 'May09-08-33_CIFAR10_adf3aac7c7_835' 'May09-08-33_CIFAR10_adf3aac7c7_85' 'May09-08-34_CIFAR10_adf3aac7c7_372')
   
@@ -119,15 +122,15 @@ if [ $config == 0 ]
   configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
   methods=( 'SLVanilla' 'BP' 'FA' ) # ('SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
 
-  method=FA
+  # method=FA
   # methods=('SLAdvImgCC0' 'SLAdvCostCC0' 'BPCC0' 'FACC0' 'SLVanillaCC0' 'SLErrorCC0' )
   # methods=('BPCC1' 'FACC1' 'SLVanillaCC1' 'SLErrorCC1' 'SLAdvImgCC1' 'SLAdvCostCC1')
   # methods=('BP' 'FA' 'SLVanilla' 'SLLatentRobust' 'SLAdvImg' 'SLError')
-  # python -u main_train.py   --config-file $configpath --method "${methods[$SLURM_ARRAY_TASK_ID]}"
+  /home/tt2684/conda-envs/pytorch_tensorflow_latest/bin/python -u main_train.py   --config-file $configpath --method "${methods[$SLURM_ARRAY_TASK_ID]}"
   # python -u main_train_hypersearch.py   --config-file $configpath --method "${methods[$SLURM_ARRAY_TASK_ID]}"
 
   # python -u main_train_autoencoders.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
-  python -u main_train_autoencoders_twocosts.py --method $method  --config-file $configpath
+  # python -u main_train_autoencoders_twocosts.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
 
 
 
@@ -148,27 +151,27 @@ if [ $config == 0 ]
   # done
 
 
-  # # method='FA'
+  # # # method='FA'
   # # # robustness to noise evaluation
   # for eval_sigma2 in `seq 1e-3 0.1 1.0` # why start at 1e-3 instead of zero? becuase numpy. doesn't accept zero as sigma2 
   # do
   # eval_epsilon=0.0
-  # python -u main_evaluate.py --eval_save_sample_images False  --method "${methods[$SLURM_ARRAY_TASK_ID]}" --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+  # # python -u main_evaluate.py --eval_save_sample_images False  --method "${methods[$SLURM_ARRAY_TASK_ID]}" --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
   # # python -u main_evaluate_autoencoders.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
   # # python -u main_evaluate_dynamic_decoder.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
-  # # python -u main_evaluate_autoencoders_twocosts.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+  # python -u main_evaluate_autoencoders_twocosts.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
   # done
 
   # # remember to run on 1 gpu to make sure hooks work as expected
   # methods='SLVanilla BP FA' # SLRobust SLError
   # for method in $methods
   # do
-  # # python -u main_evaluate.py --eval_time $now --config-file $configpath --eval_generate_RDMs True --method $method
-  # # done
+  # python -u main_evaluate.py --eval_time $now --config-file $configpath --eval_generate_RDMs True --method $method
+  # done
   # for eval_sigma2 in `seq 0.0 0.1 1.0`
   # do
   # eval_epsilon=0.0
-  # python -u main_evaluate.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time $now
+  # python -u main_evaluate.py --eval_save_sample_images False  --method "${methods[$SLURM_ARRAY_TASK_ID]}" --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time $now
   # done
   # done
   # robustness evaluation

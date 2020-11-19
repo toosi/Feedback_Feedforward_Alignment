@@ -1,9 +1,12 @@
+
 print('CONFIGURATION')
+import os
+print (os.environ['CONDA_DEFAULT_ENV'])
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
 import yaml 
-import os
+
 from datetime import datetime
 import copy
 import numpy as np

@@ -763,7 +763,7 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
                     prob = nn.Softmax(dim=1)(output.detach())
                     repb = onehot - prob
                     repb = repb.view(args.batch_size, args.n_classes, 1, 1)
-                    gener = modelB(repb.detach())
+                    _, gener = modelB(repb.detach())
                     reference = images - F.interpolate(recons, size=images.shape[-1])
 
                 elif args.method == 'SLRobust':
@@ -816,8 +816,8 @@ def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigm
             batch_time.update(time.time() - end)
             end = time.time()
 
-            # if i % args.print_freq == 0:
-            #     progress.display(i)
+            if i % args.print_freq == 0:
+                progress.display(i)
 
 
         print('Test avg {method} sigma2 {sigma2} itr: {itr} * lossd {losses.avg:.3f}'

@@ -2,7 +2,7 @@
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
 #SBATCH -c 20
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:1
 #SBATCH --mem=40gb
 #SBATCH --array=0-4
 #SBATCH --time=5-00:00:00
@@ -94,10 +94,14 @@ if [ $config == 0 ]
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/hypsaymresnet18mtm.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/hypsaymresnet18lr.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/hypsaymresnet18.txt'
-    filename='/home/tt2684/Research/Results/Symbio/runswithhash/asymresnet18_893.txt'  # 5 runs
+    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/asymresnet18_893.txt'  # 5 runs
 
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/TwoCostAEcontrolMNISTCorrSchedul.txt'
     # filename='/home/tt2684/Research/Results/Symbio/runswithhash/TwoCostAEcontrolMNISTCorrSchedulBHModu.txt'
+
+    # filename='/home/tt2684/Research/Results/Symbio/runswithhash/hypAsymResNetL10.txt' # 5 runs
+    filename='/home/tt2684/Research/Results/Symbio/runswithhash/AsymResNetL10Simple.txt' # 5 runs
+
     n=1
     runnames=()
     while read line; do
@@ -126,30 +130,30 @@ if [ $config == 0 ]
 
     
 
-    # robustness to noise evaluation
-    # for eval_sigma2 in `seq 1e-3 0.1 1.0` # why start at 1e-3 instead of zero? becuase numpy. doesn't accept zero as sigma2 
-    # do
-    # eval_epsilon=0.0
-    # # python -u main_evaluate.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
-    # # python -u main_evaluate_autoencoders.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
-    # # python -u main_evaluate_dynamic_decoder.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+    robustness to noise evaluation
+    for eval_sigma2 in `seq 1e-3 0.1 1.0` # why start at 1e-3 instead of zero? becuase numpy. doesn't accept zero as sigma2 
+    do
+    eval_epsilon=0.0
+    python -u main_evaluate.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+    # python -u main_evaluate_autoencoders.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
+    # python -u main_evaluate_dynamic_decoder.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
     # python -u main_evaluate_autoencoders_twocosts.py --eval_save_sample_images False  --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now
 
-    # done
+    done
 
     
-    ## robustness to adversarial attacks evaluation
-    for eval_epsilon in `seq 0.0 0.2 1.0`
-    do 
-    ## for eval_sigma2 in `seq 0.0 0.0 0.0`
-    ## do
-    eval_sigma2=0.0
-    echo $method
-    echo $eval_sigma2
-    echo $eval_epsilon
-    python -u main_evaluate.py  --eval_save_sample_images False --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now 
-    done
-    ##done
+    # ## robustness to adversarial attacks evaluation
+    # for eval_epsilon in `seq 0.0 0.2 1.0`
+    # do 
+    # ## for eval_sigma2 in `seq 0.0 0.0 0.0`
+    # ## do
+    # eval_sigma2=0.0
+    # echo $method
+    # echo $eval_sigma2
+    # echo $eval_epsilon
+    # python -u main_evaluate.py  --eval_save_sample_images False --method $method --eval_epsilon $eval_epsilon --eval_sigma2 $eval_sigma2  --eval_maxitr 4 --config-file $configpath --eval_time now 
+    # done
+    # ##done
     
 
     # python -u generate_figures.py --eval_swept_var sigma2 --eval_time now --config-file $configpath

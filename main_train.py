@@ -468,7 +468,6 @@ def main_worker(gpu, ngpus_per_node, args):
             ])),
             batch_size=args.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=True, drop_last=True)
-        # n_classes = 1000
 
     elif 'CIFAR' in args.dataset:
 
@@ -948,14 +947,14 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
         # switch to train mode
         modelF.train()
         modelB.train()
-           
+
+        optimizerF.zero_grad()
         # compute output
         latents, output = modelF(images)
+
         losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
 
         # compute gradient and do SGD step
-        optimizerF.zero_grad()
-        
         losse.backward()
         optimizerF.step()
 

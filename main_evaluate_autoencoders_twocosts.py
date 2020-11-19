@@ -243,8 +243,6 @@ def main_worker(gpu, ngpus_per_node, args):
         input_size = 32
         image_channels = 1
     
-        
-    
     # create encoder and decoder model
     def get_model(arch, agpu=args.gpu, args_model={}):
         if arch in model_names:
@@ -356,13 +354,12 @@ def main_worker(gpu, ngpus_per_node, args):
                                     momentum=args.momentumB,
                                     weight_decay=args.wdB) 
         
-    schedulerF = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerF, 'max', patience=args.patiencee, factor=args.factore)
-    schedulerB = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizerB, 'max', patience=args.patienced, factor=args.factord)
 
     # ------load Trained models ---------
+    assert args.method in ['BP', 'FA']
     if args.method in ['BP','FA']:
         
-        epochs_completed = torch.load(args.resultsdir+'checkpointe_autoencoder_%s.pth.tar'%args.method)['epoch']
+        epochs_completed = torch.load(args.resultsdir+'checkpointe_autoencoder_TwoCosts_%s.pth.tar'%args.method)['epoch']
         assert epochs_completed>= args.epochs
 
         modelF_trained = torch.load(args.resultsdir+'checkpointe_autoencoder_TwoCosts_%s.pth.tar'%args.method)['state_dict']
@@ -382,9 +379,9 @@ def main_worker(gpu, ngpus_per_node, args):
         
     # else:
     #     modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
-    else:
-        modelF_trained = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['state_dict']
-        modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
+    # else:
+    #     modelF_trained = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['state_dict']
+    #     modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']
 
     modelF.load_state_dict(modelF_trained)
     modelB.load_state_dict(modelB_trained)
@@ -602,7 +599,7 @@ def main_worker(gpu, ngpus_per_node, args):
             # evaluate on validation set
             for itr in range(args.eval_maxitr):
 
-                _, _, test_results = validate(val_loader,train_loader, modelF, modelB, criterione, criteriond, args, itr, args.eval_sigma2)
+                _, _, test_results = validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, args.eval_sigma2)
                 
                 acce = test_results[0]
                 Test_acce_list.extend( [round(test_results[0],3)])
@@ -653,7 +650,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
 
-def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, args, itr, sigma2):
+def validate(val_loader, modelF, modelB, criterione, criteriond, args, itr, sigma2):
 
     
     batch_time = AverageMeter('Time', ':6.3f')
@@ -709,42 +706,8 @@ def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, a
             helper_functions.generate_sample_images(images_noisy, target, title='noisy inputs', param_dict={'sigma2':sigma2}, args=args)
 
         # compute output
-        latents, _ = modelF(images_noisy)
-        
-        if (i % args.print_freq == 0) or (i == len(val_loader)):
-            # # training a linear decoder
-        
-            n_latents = latents.view(latents.shape[0], -1).shape[-1]
-            decoder = nn.Linear(n_latents, args.n_classes).cuda()
-            decoder.train()
-            optimizerD = torch.optim.SGD(decoder.parameters(), lr=0.1, weight_decay=1e-3)
-            criterionD = nn.CrossEntropyLoss()
-            
-            for ep in range(5):
-                running_lossD = 0
-                for iD, (imagesD, targetD) in enumerate(train_loader):
-                
-                    imagesD = imagesD.cuda()
-                    targetD = targetD.cuda()   
-
-                
-                    if ('MNIST' in args.dataset) and args.arche[0:2]!='FC':
-                        imagesD= imagesD.expand(-1, 1, -1, -1) #images= images.expand(-1, 3, -1, -1) 
-
-                    latentsD, _ = modelF(imagesD)
-
-                    optimizerD.zero_grad()
-                    outputsD = decoder(latentsD.view(latentsD.shape[0], -1).detach())
-                    lossD = criterionD(outputsD, targetD)
-                    lossD.backward()
-                    optimizerD.step()
-
-                    running_lossD += lossD.item()
-
-                # print(running_lossD/(iD+1))
-
-            latents, _ = modelF(images_noisy)
-            output = decoder(latents.view(latents.shape[0], -1).detach())
+        latents, output = modelF(images_noisy)
+         
 
         # ----- decoder ------------------ 
         _, recons_before_interpolation = modelB(latents.detach()) 
@@ -805,7 +768,7 @@ def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, a
 
         for _ in range(itr):
             # compute output
-            latents, _ = modelF(gener.detach())
+            latents, output = modelF(gener.detach())
 
             # ----- decoder ------------------ 
             _, recons_before_interpolation = modelB(latents.detach()) 
@@ -862,8 +825,6 @@ def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, a
         
                 # print(running_lossD/(iD+1))
 
-        latents, _ = modelF(gener)
-        output = decoder(latents.view(latents.shape[0], -1).detach())
 
         if (args.eval_save_sample_images) and not_saved_itr:
             not_saved_itr = False
@@ -871,25 +832,25 @@ def validate(val_loader, train_loader, modelF, modelB, criterione, criteriond, a
 
         
         
-            # measure accuracy and record loss
-            losse = criterione(output, target) 
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            top1.update(acc1[0].item(), images.size(0))
+        # measure accuracy and record loss
+        losse = criterione(output, target) 
+        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        top1.update(acc1[0].item(), images.size(0))
 
-            # measure correlation and record loss
-            reference = F.interpolate(reference, size=gener.shape[-1])
-            lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
+        # measure correlation and record loss
+        reference = F.interpolate(reference, size=gener.shape[-1])
+        lossd = criteriond(gener, reference) #+ criterione(modelF(pooled), target)
 
-            pcorr = correlation(gener, reference)
-            losses.update(lossd.item(), images.size(0))
-            corr.update(pcorr, images.size(0))
-                
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
+        pcorr = correlation(gener, reference)
+        losses.update(lossd.item(), images.size(0))
+        corr.update(pcorr, images.size(0))
+            
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
 
-            if i % args.print_freq == 0:
-                progress.display(i)
+        if i % args.print_freq == 0:
+            progress.display(i)
 
 
     print('Test avg {method} sigma2 {sigma2} itr: {itr} * lossd {losses.avg:.3f}'
