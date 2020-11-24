@@ -111,7 +111,8 @@ if 'AsymResLNet' in args.arche:
 elif 'asymresnet' in args.arche:
     toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
     # from models import custom_resnets as custom_models
-    from models import custom_resnets_cifar as custom_models
+    from models import custom_resnets_cifar_tmp as custom_models
+    print("***** !!! using cifar_tmp (one head SL!) !!! *******")
 
 
 elif args.arche.startswith('resnet'):
