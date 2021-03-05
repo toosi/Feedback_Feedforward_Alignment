@@ -48,7 +48,22 @@ model_urls = {
     'wide_asymresnet101_2': 'https://download.pytorch.org/models/wide_asymresnet101_2-32ee1156.pth',
 }
 
+# ----- added this MaxPool for maxpooling over channels at the top of the net
+from torch.nn import MaxPool1d
+import torch.nn.functional as F 
 
+class ChannelPool(MaxPool1d):
+    def forward(self, input):
+        n, c, w, h = input.size()
+        input = input.view(n,c,w*h).permute(0,2,1)
+        pooled =  F.max_pool1d(input, self.kernel_size, self.stride,
+                        self.padding, self.dilation, self.ceil_mode,
+                        self.return_indices)
+        _, _, c = pooled.size()
+        pooled = pooled.permute(0,2,1)
+        return pooled.view(n,c,w,h)
+
+# -----
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1, bias=False, algorithm='BP'):
     """3x3 convolution with padding"""
     return Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
@@ -179,8 +194,7 @@ class AsymResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2], algorithm=algorithm)
 
-        self.conv2 = Conv2d(512, n_classes, kernel_size=3, stride=1, padding=1,
-                               bias=False, algorithm=algorithm)
+        self.conv2 = ChannelPool(kernel_size=50) #Conv2d(512, n_classes, kernel_size=1, stride=1, bias=False, algorithm=algorithm) 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         # self.fc = nn.Linear(512 * block.expansion, n_classes) #Linear(512 * block.expansion, n_classes, algorithm=algorithm)
 
@@ -235,10 +249,12 @@ class AsymResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
-        x = self.layer4(x)
-        latent = self.conv2(x)
+        latent = self.layer4(x)
+        x = self.conv2(latent)
 
-        features = self.avgpool(latent)
+        features = self.avgpool(x)
+
+        #print(l)
 
         return latent, features.squeeze()
 
@@ -488,8 +504,8 @@ class AsymResNetT(nn.Module):
         self.groups = groups
         self.base_width = width_per_group
 
-        self.conv2 = ConvTranspose2d(n_classes, 512, kernel_size=3, stride=1, padding=1,
-                                bias=False, padding_mode='zeros', algorithm=algorithm)
+        # self.conv2 = ConvTranspose2d(n_classes, 512, kernel_size=1, stride=1, padding=1,
+        #                         bias=False, padding_mode='zeros', algorithm=algorithm)
 
         self.layer4 = self._make_layer(block, 256, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2], algorithm=algorithm)
@@ -556,7 +572,7 @@ class AsymResNetT(nn.Module):
     def _forward_impl(self, x):
 
         
-        x = self.conv2(x) 
+        #x = self.conv2(x) 
         
         x = self.layer4(x)
         x = self.layer3(x)

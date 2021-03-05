@@ -122,7 +122,7 @@ if 'AsymResLNet' in args.arche:
 elif 'asymresnet' in args.arche:
     toggle_state_dict = state_dict_utils.toggle_state_dict_resnets
 
-    from models import custom_resnets_cifar as custom_models
+    from models import custom_resnets_cifar_tmp as custom_models
 
 elif args.arche.startswith('resnet'):
     from models import resnets as custom_models
@@ -362,8 +362,9 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # ------load Trained models ---------
     epochs_completed = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['epoch']
-    assert epochs_completed>= args.epochs, print('loaded epochs %d but args.epoch=%d'%(epochs_completed, args.epoch))
-    
+    assert epochs_completed>= args.epochs, print('loaded epochs %d but args.epoch=%d'%(epochs_completed, args.epochs))
+    # print('**** ATT : assert diabled ****') 
+
     modelF_trained = torch.load(args.resultsdir+'checkpointe_%s.pth.tar'%args.method)['state_dict']
     # if args.method.startswith('SL') or args.method == 'BSL':
     #     modelB_trained = torch.load(args.resultsdir+'checkpointd_%s.pth.tar'%args.method)['state_dict']

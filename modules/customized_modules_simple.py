@@ -175,7 +175,8 @@ class LinearModule(nn.Module):
     def reset_parameters(self):
         init.kaiming_uniform_(self.weight, a=math.sqrt(5))
         if self.algorithm == 'FA':
-            init.kaiming_uniform_(self.weight_feedback, a=math.sqrt(5))
+            # ATT: mode=fan_out and nonllin= relu
+            init.kaiming_uniform_(self.weight_feedback, a=math.sqrt(5), mode='fan_out', nonlinearity='relu')
         elif self.algorithm == 'BP':
             self.weight_feedback = copy.deepcopy(self.weight)
 
@@ -244,7 +245,8 @@ class _ConvNdFA(nn.Module):
     def reset_parameters(self):
         init.kaiming_uniform_(self.weight, a=math.sqrt(5))
         if self.algorithm == 'FA':
-            init.kaiming_uniform_(self.weight_feedback, a=math.sqrt(5))
+            # Att: mode='fan_out' and nonlinearity = 'relu'
+            init.kaiming_uniform_(self.weight_feedback, a=math.sqrt(5), mode='fan_out', nonlinearity='relu')
         elif self.algorithm == 'BP':
             self.weight_feedback = copy.deepcopy(self.weight)
 

@@ -46,6 +46,7 @@ pp = pprint.PrettyPrinter(indent=4)
 from utils import state_dict_utils
 
 import pytorch_ssim
+from optimizers import LARC
 
 
 # # toggle_state_dict = state_dict_utils.toggle_state_dict # for ResNetLraveled
@@ -951,7 +952,9 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
 
         optimizerF.zero_grad()
         # compute output
-        latents, output = modelF(images)
+        sigma2 = 0.1
+        noisy_images = images + torch.empty_like(images).normal_(mean=0, std=np.sqrt(sigma2))
+        latents, output = modelF(noisy_images)
 
         losse = criterione(output, target) #+ criteriond(modelB(latents.detach(), switches), images)
 
@@ -1009,8 +1012,10 @@ def train(train_loader, modelF, modelB,  criterione, criteriond, optimizerF, opt
                 
 
         elif args.method.startswith('SL'):
-            # ----- decoder ------------------    
-            latents,  output = modelF(images)
+            # ----- decoder ------------------  
+            noisy_images = images + torch.empty_like(images).normal_(mean=0, std=np.sqrt(sigma2))
+  
+            latents,  output = modelF(noisy_images)
             
 
             # switch to train mode
@@ -1482,7 +1487,7 @@ def accuracy(output, target, topk=(1,)):
 
         res = []
         for k in topk:
-            correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+            correct_k = correct[:k].contiguous().view(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 

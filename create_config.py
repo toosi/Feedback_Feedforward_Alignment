@@ -229,7 +229,7 @@ project = 'Symbio' #'SYY_MINST'
 arch = 'E%sD%s'%(args.arche, args.archd)
 
 args.imagesetdir = path_prefix+'/Data/'
-args.runname = rundatetime+'_%s_%s_'%(args.dataset,commit[0:min(len(commit), 10)])+str(hash)
+args.runname = rundatetime+'_2021_%s_%s_'%(args.dataset,commit[0:min(len(commit), 10)])+str(hash)
 
 if args.hash is not None:
     if not os.path.exists(path_prefix+'/Results/Symbio/runswithhash'):
