@@ -48,7 +48,7 @@ model_urls = {
     'wide_asymresnet101_2': 'https://download.pytorch.org/models/wide_asymresnet101_2-32ee1156.pth',
 }
 
-# ----- added this MaxPool for maxpooling over channels at the top of the net
+# ----- added this MaxPool for maxpooling over s at the top of the net
 from torch.nn import MaxPool1d
 import torch.nn.functional as F 
 
@@ -169,7 +169,7 @@ class AsymResNet(nn.Module):
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
-
+        self.n_classes = n_classes
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
@@ -193,14 +193,23 @@ class AsymResNet(nn.Module):
                                        dilate=replace_stride_with_dilation[1], algorithm=algorithm)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2], algorithm=algorithm)
-
-        self.conv2 = ChannelPool(kernel_size=50) #Conv2d(512, n_classes, kernel_size=1, stride=1, bias=False, algorithm=algorithm) 
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.pooling_kernel = int(512/n_classes)
+        print(self.pooling_kernel,n_classes)
+        if self.pooling_kernel:
+            
+            self.chpool = ChannelPool(kernel_size=self.pooling_kernel) 
+            self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+            
+        else:
+#             assert n_classes== 512
+            
+            self.avgpool = nn.AdaptiveAvgPool2d((1, 2))
         # self.fc = nn.Linear(512 * block.expansion, n_classes) #Linear(512 * block.expansion, n_classes, algorithm=algorithm)
 
         for m in self.modules():
             if isinstance(m, Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                pass
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 if m.affine:
                     nn.init.constant_(m.weight, 1)
@@ -241,7 +250,8 @@ class AsymResNet(nn.Module):
 
     def forward(self, x):
         # See note [TorchScript super()]
-        x = self.conv1(x)
+
+        x = self.conv1(x)    
         x = self.bn1(x)
         x = self.relu(x)
         # x = self.maxpool(x) withiut maxpool the output is of size 14x14 instead of 7x7
@@ -250,13 +260,15 @@ class AsymResNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         latent = self.layer4(x)
-        x = self.conv2(latent)
+        
+        if self.pooling_kernel:
+            x = self.chpool(latent)
+            features = self.avgpool(x).squeeze()
+        else:
+            features = self.avgpool(latent).squeeze()
+            features = features.view((features.shape[0], 512*2))[:,:self.n_classes]
 
-        features = self.avgpool(x)
-
-        #print(l)
-
-        return latent, features.squeeze()
+        return latent, features
 
 
 def _asymresnet(arch, block, layers, pretrained, progasymress, **kwargs):

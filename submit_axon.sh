@@ -1,10 +1,10 @@
 #!/bin/sh
 #SBATCH --job-name=Symbio # The job name.
 #SBATCH -o /scratch/issa/users/tt2684/Research/Report/output_Symbio.%j.out # STDOUT
-#SBATCH -c 48
-#SBATCH --gres=gpu:8
-#SBATCH --mem=180gb
-#SBATCH --array=0-2
+#SBATCH -c 20
+#SBATCH --gres=gpu:2
+#SBATCH --mem=40gb
+# #SBATCH --array=0-1  
 
 if [ X"$SLURM_STEP_ID" = "X" -a X"$SLURM_PROCID" = "X"0 ]
 then
@@ -43,7 +43,7 @@ config=0
 
 #python -u create_config.py -dataset CIFAR10 --momentumF 0. --momentumB 0. -ae asymresnet18 -ad asymresnetT18  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 600  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
-#python -u create_config.py -dataset imagenet --momentumF 0. --momentumB 0. -ae asymresnet18 -ad asymresnetT18  -j 4 --input_size 224 --base_channels 64 --batch-size 64 --epoch 1000  --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
+#python -u create_config.py -dataset imagenet --momentumF 0. --momentumB 0. -ae asymresnet18 -ad asymresnetT18  -j 4 --input_size 224 --base_channels 64 --batch-size 64 --epoch 1000  --optimizerF 'SGD' --optimizerB 'SGD' --lrF 1e-2 --lrB 1e-2 --wdF 1e-5 --wdB 1e-5 --patiencee 50 --patienced 40 -p 100 --note  $note ; config=1  #
 
 # python -u create_config.py --hash TestMNIST -dataset MNIST  -j 24 --input_size 32 --base_channels 64 --batch-size 256 --epoch 300 -ae AsymResLNet10F -ad AsymResLNet10B --optimizerF 'RMSprop' --optimizerB 'RMSprop' --lrF 1e-3 --lrB 1e-3 --wdF 1e-5 --wdB 1e-6 --patiencee 50 --patienced 45 -p 100 --note  $note ; config=1  #
 
@@ -84,7 +84,8 @@ config=0
 
 if [ $config == 0 ]
   then
-  runname=Mar05-08-53_2021_CIFAR10_1f4065b782_540
+  runname=Mar04-09-26_2021_CIFAR10_1f4065b782_648
+  #Mar05-15-34_2021_imagenet_7e164cd5f5_6
 
   #'Mar01-11-04_CIFAR10_1f4065b782_868' #'Feb16-16-54_CIFAR10_1f4065b782_729' #'Nov24-09-29_CIFAR10_9106b0f90e_476' #'Dec03-15-24_CIFAR10_1f4065b782_803'
   
@@ -95,7 +96,7 @@ if [ $config == 0 ]
 
   # configpath="/home/tahereh/Documents/Research/Results/Symbio/Symbio/$runname/configs.yml"
   configpath="/home/tt2684/Research/Results/Symbio/Symbio/$runname/configs.yml"
-  methods=('BP' 'FA') # ('SLVanilla' 'FA'  'SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
+  methods=('BP') # ('SLVanilla' 'FA'  'SLError' 'SLAdvImg' 'SLLatentRobust')'IA'  'BP' 'FA' 'SLError' 'SLAdvImg' 'SLAdvCost' 'SLLatentRobust' 'SLConv1')
 
   # method=FA
   # methods=('SLAdvImgCC0' 'SLAdvCostCC0' 'BPCC0' 'FACC0' 'SLVanillaCC0' 'SLErrorCC0' )
@@ -105,7 +106,8 @@ if [ $config == 0 ]
   # python -u main_train_hypersearch.py   --config-file $configpath --method "${methods[$SLURM_ARRAY_TASK_ID]}"
 
   # python -u main_train_autoencoders.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
-  python -u main_train_autoencoders_twocosts.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
+  # python -u main_train_autoencoders_twocosts.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
+  python -u main_train_autoencoders_twocosts_PCGrad.py --method "${methods[$SLURM_ARRAY_TASK_ID]}"  --config-file $configpath
 
 
 
