@@ -35,12 +35,18 @@ FeedbackFeedforwradAlignment/Generate_Figures/Fig3_robustness_evaluation.ipynb
 
 
 @inproceedings{
-Toosi2023brainlike,
+Toosi2023brainlike, 
+
 title={Brain-like Flexible Visual Inference by Harnessing Feedback Feedforward Alignment},
+
 author={Toosi, Tahereh and Issa, Elias B},
+
 booktitle={Thirty-seventh Conference on Neural Information Processing Systems},
+
 year={2023},
+
 url={https://openreview.net/forum?id=DBlkX8Nczr}
+
 }
 
 
