@@ -32,6 +32,8 @@ FeedbackFeedforwradAlignment/Generate_Figures/Fig3_robustness_evaluation.ipynb
 ## Inference phase (brain-like flexible visual inference such as de-occlusions, imagination, and hallucinations)
 
 ## Citation
+
+
 @inproceedings{
 Toosi2023brainlike,
 title={Brain-like Flexible Visual Inference by Harnessing Feedback Feedforward Alignment},
