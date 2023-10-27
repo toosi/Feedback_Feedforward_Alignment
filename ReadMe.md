@@ -1,30 +1,54 @@
-# Symbiotic Learning
+# Feedback feedforward alignment
+This repository is the official implementatin of "Brain-like Flexible Visual Inference by Harnessing Feedback Feedforward Alignment" appeared in [NeurIPS 2023](https://neurips.cc/virtual/2023/poster/72387).
+
+**We are adding more code to this repo **
+
+![concept](./assests/FFA_concept.png)
+
+## Learning phase (Training)
 
 
-## Control Discriminators
+The checkpoints are available at the following links: 
+|         | FFA                        | BP                         | FA                         | checkpoints                                                                                     |
+|---------|----------------------------|----------------------------|----------------------------|-----------------------------------------------------------------------------------------------------|
+| MNIST   | discr:98.87%, recons:0.98  | discr:99.47%, recons:0.02  | discr:97.51%, recons:0.01  | [download](https://drive.google.com/drive/folders/1iGxrVyOvwn_Qkeg0BigzqChdREMetAkG?usp=drive_link) |
+| CIFAR10 | discr:76.47%, recons:0.88 | discr:88.53%, recons:0.01 | discr:71.56%, recons:0.01 | download                                                                                        |
+|         |                            |                            |                            |                                                                                                     |
 
-## Control Autoencoders
-We have two types of control autoencoders:
-1. End-to-End reconstruction cost
-    * Training: main_train_autoencoders.py
-    * Evaluation: main_evaluate_autoencoders.py
-1. Two-objective autoencoders: discriminative encoder and 
-reconstrucntion
-    * Training: main_train_autoencoders_twocosts.py
-    * Evaluation: main_evaluate_autoencoders_twocosts.py  
+## Validation
+To generate figures for training evaluation 
+FeedbackFeedforwradAlignment/Generate_Figures/Fig2_Training_results.ipynb
+To generate figures for robustness evaluation
+
+FeedbackFeedforwradAlignment/Generate_Figures/Fig3_robustness_evaluation.ipynb
+1. Accuracy
+
+2. Reconstruction performance
+
+3. Alignment
+
+4. Noise robustness
+
+5. Adversarial robustness
+   
+## Inference phase (brain-like flexible visual inference such as de-occlusions, imagination, and hallucinations)
+
+## Citation
 
 
-### Things to remember:
-After running the autoencoder with two cost functions:
-    * In the main_train there was a second optimizer.step() that I removed after
-    submission to NeurIPS' workshop.
+@inproceedings{
+Toosi2023brainlike, 
 
-    * In create_config, when creating modelB, algorithm was 'BP' (line 297), I changed it to FA
+title={Brain-like Flexible Visual Inference by Harnessing Feedback Feedforward Alignment},
 
-    * 10-19-2020: I changed the modules used in ResLNets from layerwise to simple to test wether I could replicate SLVanilla 81.
-    * 10-19-2020: in modules layerwise, I added custom ReLU which has nonlinear backward, and ommited inplace=True
+author={Toosi, Tahereh and Issa, Elias B},
 
-    * in both main_train_autoencoder and main_train_autoencoder_twocosts I had the schedulerF operate on 'max'imizing the accuracy which is obviously wrong, I corrected it on Oct 28th and ran TwoCostAEcontrolMNISTCorrSchedul  
-## SL + BiHebb using PCGrad
+booktitle={Thirty-seventh Conference on Neural Information Processing Systems},
 
-In *main_train_PCGrad* I force modelF and modelB to tolerate each other's gradient usnig PCGrad.  
+year={2023},
+
+url={https://openreview.net/forum?id=DBlkX8Nczr}
+
+}
+
+

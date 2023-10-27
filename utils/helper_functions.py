@@ -1,3 +1,174 @@
+import yaml 
+import json
+import copy
+
+'''
+    For the given path, get the List of all files in the directory tree 
+'''
+def getListOfFiles(dirName):
+    # create a list of file and sub directories 
+    # names in the given directory 
+    listOfFile = os.listdir(dirName)
+    allFiles = list()
+    # Iterate over all the entries
+    for entry in listOfFile:
+        # Create full path
+        fullPath = os.path.join(dirName, entry)
+        # If entry is a directory then get the list of files in this directory 
+        if os.path.isdir(fullPath):
+            allFiles = allFiles + getListOfFiles(fullPath)
+        else:
+            allFiles.append(fullPath)
+                
+    return allFiles
+
+
+
+def get_measure_dicts_json(hashname_disc, n_epochs_disc, path_prefix, resultsdir):
+#     fig, ax = plt.subplots(1,1, figsize=(5,3.5))
+    #'RMSpropRMSpropMNISTAsymResLNet10' #'RMSpropRMSpropMNISTFullyConn' ##'RMSpropRMSpropMNISTFullyConnE150'
+    # 'RMSpRMSpMNISTAsymResLNet10BNaffine'
+    methods = ['SLVanilla','BP', 'FA']
+    colors = {'FA':'k', 'BP':'k', 'SLVanilla':'red'}
+    linestyles = {'FA':'--', 'BP':'-', 'SLVanilla':'-'}
+    if 'AsymResLNet' in hashname_disc:
+        markers = {'FA':'o', 'BP':'o', 'SLVanilla':'o'}
+    elif 'FullyConn' in hashname_disc:
+        markers = {'FA':'s', 'BP':'s', 'SLVanilla':'s'}
+
+    facecolors = {'FA':'none', 'BP':'k', 'SLVanilla':'red'}
+
+    with open(path_prefix + '/Results/Symbio/runswithhash/%s.txt'%hashname_disc) as f:
+        Lines = f.readlines() 
+
+    valid_runnames = []
+#     fig, ax = plt.subplots(1,1, figsize=(12,8))
+    for l in Lines:
+        runname = l.strip('\n')
+
+        configs = yaml.safe_load(open(resultsdir + '/%s/configs.yml'%runname, 'r'))
+        list_json_paths = []
+        for method in methods:
+            p = resultsdir + '/%s/run_json_dict_%s.json'%(runname, method)
+            if os.path.exists(p):
+                
+                with open(p,"r") as jfile:
+                    dj = json.load(jfile)
+                
+                if len(dj['Test_acce']) >= n_epochs_disc: #configs['epochs']:
+                    list_json_paths.append(p)
+                else:
+                    print(len(dj['Test_acce']),n_epochs_disc, configs['epochs'])
+                    
+        
+        if len(list_json_paths) == len(methods):
+            valid_runnames.append(runname)
+            configs = yaml.safe_load(open(resultsdir + '/%s/configs.yml'%runname, 'r'))
+        else:
+            print(list_json_paths)
+
+    print('number of valid runs discriminative',len(valid_runnames))
+
+#     n_pochs = 370 #configs['epochs']
+    arch =  configs['arche'][:-1]
+
+    test_init = np.zeros((len(valid_runnames),n_epochs_disc))
+    test_acc_dict = {}
+    test_corrd_dict = {}
+    test_lossd_dict = {}
+    for method in methods:
+        test_acc_dict[method] = copy.deepcopy(test_init)
+        test_corrd_dict[method] = copy.deepcopy(test_init)
+        test_lossd_dict[method] = copy.deepcopy(test_init)
+
+    for r, runname in enumerate(valid_runnames):
+        configs = yaml.safe_load(open(path_prefix + '/Results/Symbio/Symbio/%s/configs.yml'%runname, 'r'))
+
+        for method in methods:
+            p = resultsdir + '%s/run_json_dict_%s.json'%(runname, method)
+            with open(p,"r") as jfile:
+                dj = json.load(jfile)
+            label = method 
+#             ax.plot(dj['lrF'], label=label, color=colors[method], ls=linestyles[method])
+            test_acc_dict[method][r] = dj['Test_acce'][0:n_epochs_disc]
+            test_corrd_dict[method][r] = dj['Test_corrd'][0:n_epochs_disc]
+            test_lossd_dict[method][r] = dj['Test_lossd'][0:n_epochs_disc]
+    return test_acc_dict, test_corrd_dict, test_lossd_dict, configs, valid_runnames
+
+
+
+
+def get_measure_dicts_ae_json(hashname_ae, n_epochs_ae, path_prefix, resultsdir):
+    #'RMSpropRMSpropMNISTAsymResLNet10' #'RMSpropRMSpropMNISTFullyConn' ##'RMSpropRMSpropMNISTFullyConnE150'
+    # 'RMSpRMSpMNISTAsymResLNet10BNaffine'
+#     fig, ax = plt.subplots(1,1, figsize=(5,3.5))
+    methods = ['BP', 'FA']
+    colors = {'FA':'k', 'BP':'k'}
+    linestyles = {'FA':'--', 'BP':'-'}
+
+    with open(path_prefix + '/Results/Symbio/runswithhash/%s.txt'%hashname_ae) as f:
+        Lines = f.readlines() 
+
+    valid_runnames = []
+#     fig, ax = plt.subplots(1,1, figsize=(12,8))
+    for l in Lines:
+        runname = l.strip('\n')
+
+        configs = yaml.safe_load(open(resultsdir + '/%s/configs.yml'%runname, 'r'))
+        list_json_paths = []
+        for method in methods:
+            p = resultsdir + '/%s/run_json_dict_autoencoder_%s.json'%(runname, method)
+            if os.path.exists(p):
+                
+                with open(p,"r") as jfile:
+                    dj = json.load(jfile)
+                
+                if len(dj['Test_acce']) >= n_epochs_ae: #configs['epochs']:
+                    list_json_paths.append(p)
+                else:
+                    print('auto',len(dj['Test_acce']), n_epochs_ae, configs['epochs'])
+                    
+        
+        if len(list_json_paths) == len(methods):
+            valid_runnames.append(runname)
+            configs = yaml.safe_load(open(path_prefix + '/Results/Symbio/Symbio/%s/configs.yml'%runname, 'r'))
+
+    print('number of valid runs autoencoder',len(valid_runnames))
+
+#     n_pochs = 370 #configs['epochs']
+    arch =  configs['arche'][:-1]
+
+    test_init = np.zeros((len(valid_runnames),n_epochs_ae))
+    test_acc_dict = {}
+    test_corrd_dict = {}
+    test_lossd_dict = {}
+    for method in methods:
+        test_acc_dict[method] = copy.deepcopy(test_init)
+        test_corrd_dict[method] = copy.deepcopy(test_init)
+        test_lossd_dict[method] = copy.deepcopy(test_init)
+
+    for r, runname in enumerate(valid_runnames):
+        configs = yaml.safe_load(open(resultsdir + '/%s/configs.yml'%runname, 'r'))
+
+        for method in methods:
+            p = resultsdir + '/%s/run_json_dict_autoencoder_%s.json'%(runname, method)
+            with open(p,"r") as jfile:
+                dj = json.load(jfile)
+            label = method 
+#             ax.plot(dj['lrF'], label=label, color=colors[method], ls=linestyles[method])
+            test_acc_dict[method][r] = dj['Test_acce'][0:n_epochs_ae]
+            test_corrd_dict[method][r] = dj['Test_corrd'][0:n_epochs_ae]
+            test_lossd_dict[method][r] = dj['Test_lossd'][0:n_epochs_ae]
+            if method == 'FA' and np.all(test_corrd_dict[method][r]<0.9):
+                print('inja',runname, len(dj['Test_corrd']))
+    return test_acc_dict, test_corrd_dict, test_lossd_dict, configs, valid_runnames
+
+
+
+
+
+
+
 
 
 class VanillaBackprop():

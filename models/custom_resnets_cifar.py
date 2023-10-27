@@ -48,7 +48,22 @@ model_urls = {
     'wide_asymresnet101_2': 'https://download.pytorch.org/models/wide_asymresnet101_2-32ee1156.pth',
 }
 
+# ----- added this MaxPool for maxpooling over s at the top of the net
+from torch.nn import MaxPool1d
+import torch.nn.functional as F 
 
+class ChannelPool(MaxPool1d):
+    def forward(self, input):
+        n, c, w, h = input.size()
+        input = input.view(n,c,w*h).permute(0,2,1)
+        pooled =  F.max_pool1d(input, self.kernel_size, self.stride,
+                        self.padding, self.dilation, self.ceil_mode,
+                        self.return_indices)
+        _, _, c = pooled.size()
+        pooled = pooled.permute(0,2,1)
+        return pooled.view(n,c,w,h)
+
+# -----
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1, bias=False, algorithm='BP'):
     """3x3 convolution with padding"""
     return Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
@@ -154,7 +169,7 @@ class AsymResNet(nn.Module):
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
-
+        self.n_classes = n_classes
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
@@ -178,13 +193,23 @@ class AsymResNet(nn.Module):
                                        dilate=replace_stride_with_dilation[1], algorithm=algorithm)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2], algorithm=algorithm)
-
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.pooling_kernel = int(512/n_classes)
+        print(self.pooling_kernel,n_classes)
+        if self.pooling_kernel:
+            
+            self.chpool = ChannelPool(kernel_size=self.pooling_kernel) 
+            self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+            
+        else:
+#             assert n_classes== 512
+            
+            self.avgpool = nn.AdaptiveAvgPool2d((1, 2))
         # self.fc = nn.Linear(512 * block.expansion, n_classes) #Linear(512 * block.expansion, n_classes, algorithm=algorithm)
 
         for m in self.modules():
             if isinstance(m, Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                pass
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 if m.affine:
                     nn.init.constant_(m.weight, 1)
@@ -225,7 +250,8 @@ class AsymResNet(nn.Module):
 
     def forward(self, x):
         # See note [TorchScript super()]
-        x = self.conv1(x)
+
+        x = self.conv1(x)    
         x = self.bn1(x)
         x = self.relu(x)
         # x = self.maxpool(x) withiut maxpool the output is of size 14x14 instead of 7x7
@@ -234,10 +260,15 @@ class AsymResNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         latent = self.layer4(x)
+        
+        if self.pooling_kernel:
+            x = self.chpool(latent)
+            features = self.avgpool(x).squeeze()
+        else:
+            features = self.avgpool(latent).squeeze()
+            features = features.view((features.shape[0], 512*2))[:,:self.n_classes]
 
-        features = self.avgpool(latent)
-
-        return latent, features.squeeze()
+        return latent, features
 
 
 def _asymresnet(arch, block, layers, pretrained, progasymress, **kwargs):
@@ -485,7 +516,7 @@ class AsymResNetT(nn.Module):
         self.groups = groups
         self.base_width = width_per_group
 
-        # self.conv2 = ConvTranspose2d(n_classes, 512, kernel_size=3, stride=1, padding=1,
+        # self.conv2 = ConvTranspose2d(n_classes, 512, kernel_size=1, stride=1, padding=1,
         #                         bias=False, padding_mode='zeros', algorithm=algorithm)
 
         self.layer4 = self._make_layer(block, 256, layers[3], stride=2,
@@ -551,12 +582,9 @@ class AsymResNetT(nn.Module):
         return nn.Sequential(*layers)
 
     def _forward_impl(self, x):
-        # See note [TorchScript super()]
-       
-        # x = torch.flatten(x, 1)
-        # x = self.avgpool(x)
+
         
-        # x = self.conv2(x) 
+        #x = self.conv2(x) 
         
         x = self.layer4(x)
         x = self.layer3(x)
